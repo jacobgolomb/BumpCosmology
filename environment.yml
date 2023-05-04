@@ -1,6 +1,13 @@
+channels:
+  - conda-forge
+  - defaults
 dependencies:
-  - conda-forge::numpy=1.19.2
-  - conda-forge::pip=21.0.1
-  - conda-forge::python=3.9
-  - pip:
-      - matplotlib==3.4.3
+  - arviz
+  - astropy
+  - h5py
+  - numpy
+  - jupyterlab
+  - matplotlib
+  - pymc=5
+  - pytensor
+  - seaborn

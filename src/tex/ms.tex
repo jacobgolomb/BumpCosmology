@@ -1,56 +1,67 @@
 % Define document class
-\documentclass[twocolumn]{aastex631}
+\documentclass[modern]{aastex631}
 \usepackage{showyourwork}
+
+\newcommand{\todo}[1]{\textcolor{cyan}{TODO: #1}}
 
 % Begin!
 \begin{document}
 
 % Title
-\title{An open source scientific article}
+\title{Calibrated Cosmography With a Physical Model of the Black Hole Mass Function}
 
 % Author list
-\author{@farr}
+\author[0000-0003-1540-8562]{Will M. Farr}
+\affiliation{Department of Physics and Astronomy, Stony Brook University, Stony Brook NY 11794, USA}
+\affiliation{Center for Computational Astrophysics, Flatiron Institute, New York NY 10010, USA}
+\email{will.farr@stonybrook.edu}
+\email{wfarr@flatironinstitute.org}
 
 % Abstract with filler text
 \begin{abstract}
-    Lorem ipsum dolor sit amet, consectetuer adipiscing elit.
-    Ut purus elit, vestibulum ut, placerat ac, adipiscing vitae, felis.
-    Curabitur dictum gravida mauris, consectetuer id, vulputate a, magna.
-    Donec vehicula augue eu neque, morbi tristique senectus et netus et.
-    Mauris ut leo, cras viverra metus rhoncus sem, nulla et lectus vestibulum.
-    Phasellus eu tellus sit amet tortor gravida placerat.
-    Integer sapien est, iaculis in, pretium quis, viverra ac, nunc.
-    Praesent eget sem vel leo ultrices bibendum.
-    Aenean faucibus, morbi dolor nulla, malesuada eu, pulvinar at, mollis ac.
-    Curabitur auctor semper nulla donec varius orci eget risus.
-    Duis nibh mi, congue eu, accumsan eleifend, sagittis quis, diam.
-    Duis eget orci sit amet orci dignissim rutrum.
+    Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Ut purus elit,
+    vestibulum ut, placerat ac, adipiscing vitae, felis. Curabitur dictum
+    gravida mauris, consectetuer id, vulputate a, magna. Donec vehicula augue eu
+    neque, morbi tristique senectus et netus et. Mauris ut leo, cras viverra
+    metus rhoncus sem, nulla et lectus vestibulum. Phasellus eu tellus sit amet
+    tortor gravida placerat. Integer sapien est, iaculis in, pretium quis,
+    viverra ac, nunc. Praesent eget sem vel leo ultrices bibendum. Aenean
+    faucibus, morbi dolor nulla, malesuada eu, pulvinar at, mollis ac. Curabitur
+    auctor semper nulla donec varius orci eget risus. Duis nibh mi, congue eu,
+    accumsan eleifend, sagittis quis, diam. Duis eget orci sit amet orci
+    dignissim rutrum.
 \end{abstract}
 
 % Main body with filler text
 \section{Introduction}
 \label{sec:intro}
 
-Lorem ipsum dolor sit amet, consectetuer adipiscing elit.
-Ut purus elit, vestibulum ut, placerat ac, adipiscing vitae, felis.
-Curabitur dictum gravida mauris, consectetuer id, vulputate a, magna.
-Donec vehicula augue eu neque, morbi tristique senectus et netus et.
-Mauris ut leo, cras viverra metus rhoncus sem, nulla et lectus vestibulum.
-Phasellus eu tellus sit amet tortor gravida placerat.
-Integer sapien est, iaculis in, pretium quis, viverra ac, nunc.
-Praesent eget sem vel leo ultrices bibendum.
-Aenean faucibus, morbi dolor nulla, malesuada eu, pulvinar at, mollis ac.
-Curabitur auctor semper nulla donec varius orci eget risus.
-Duis nibh mi, congue eu, accumsan eleifend, sagittis quis, diam.
-Duis eget orci sit amet orci dignissim rutrum.
+\begin{figure}
+    \begin{center}
+        \includegraphics[width=\columnwidth]{figures/m1-vs-m2.pdf}
+    \end{center}
+    \caption{Approximate population-weighted source frame masses from our set of detections.  For each event we show the 50\% and 90\% credible regions.  The source frame masses are computed assuming a \todo{cosmology}.}
+    \label{fig:m1-vs-m2}
+    \script{m1-vs-m2.py}
+\end{figure}
 
-Nam dui ligula, fringilla a, euismod sodales, sollici- tudin vel, wisi.
-Morbi auctor lorem non justo, nam lacus libero, pretium at, lobortis vitae.
-Donec aliquet, tortor sed accumsan bibendum, erat ligula aliquet magna.
-Morbi ac orci et nisl hendrerit mollis, suspendisse ut massa, cras nec ante.
-Pellentesque a nulla cum sociis natoque penatibus et magnis dis parturient.
-Aliquam tincidunt urna, nulla ullamcorper vestibulum turpis.
-Pellentesque cursus luctus mauris \citep{Luger2021}.
+\begin{figure}
+    \begin{center}
+        \includegraphics[width=\columnwidth]{figures/dNdm_PISN_effects.pdf}
+    \end{center}
+    \caption{Effect of changing various parameters in our model of the mass function.}
+    \label{fig:dNdm_PISN_effects}
+    \script{dNdm_PISN_effects.py}
+\end{figure}
+
+\begin{figure}
+    \begin{center}
+        \includegraphics[width=\columnwidth]{figures/dNdm_fitted.pdf}
+    \end{center}
+    \caption{Merger rate per primary mass at equal mass ratio and redshift zero inferred by our model fitted to the observations in O3.}
+    \label{fig:dNdm_fitted}
+    \script{dNdm_fitted.py}
+\end{figure}
 
 \bibliography{bib}
 

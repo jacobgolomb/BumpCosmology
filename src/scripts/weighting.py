@@ -1,28 +1,34 @@
 import astropy.cosmology as cosmo
 from astropy.cosmology import Planck18
 import astropy.units as u
+import dataclasses
+from dataclasses import dataclass
 import h5py
 import intensity_models
 import numpy as np
 import pytensor
 import pytensor.tensor as pt
 
-a = 1.0
-b = -0.30
-c = 1.9
-mpisn = 33.0
-mbhmax = 38.0
-sigma = 3.4
-fpl = 0.16
-beta = -1.9
-lam = 3.5
-kappa = 7.1
-zp = 2.1
+@dataclass
+class ModelParameters(object):
+    a: object = 1.2
+    b: object  = -0.35
+    c: object = 2.1
+    mpisn: object = 33.0
+    mbhmax: object = 37.0
+    sigma: object = 3.6
+    fpl: object = 0.19
+    beta: object = -1.7
+    lam: object = 3.8
+    kappa:object = 7.3
+    zp: object = 2.0
+
+default_parameters = ModelParameters()
 
 m = pt.dvector('m1')
 q = pt.dvector('q')
 z = pt.dvector('z')
-default_log_dNdmdqdV = pytensor.function([m,q,z], intensity_models.LogDNDMDQDV(a, b, c, mpisn, mbhmax, sigma, fpl, beta, lam, kappa, zp)(m,q,z))
+default_log_dNdmdqdV = pytensor.function([m,q,z], intensity_models.LogDNDMDQDV(default_parameters.a, default_parameters.b, default_parameters.c, default_parameters.mpisn, default_parameters.mbhmax, default_parameters.sigma, default_parameters.fpl, default_parameters.beta, default_parameters.lam, default_parameters.kappa, default_parameters.zp)(m,q,z))
 default_log_dNdmdqdV.__doc__ = r"""
 Default mass-redshift distribution, more-or-less a reasonable fit to O3a.
 """

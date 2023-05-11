@@ -162,3 +162,6 @@ def extract_selection_samples(file, nsamp, desired_pop_wt=None, far_threshold=1,
         ndraw_cut = nsamp
 
         return m1s_sel_cut, qs_sel_cut, zs_sel_cut, pdraw_sel_cut, ndraw_cut
+    
+def dm1qz_dm1dqdl(m1, q, z):
+    return (1+z)/(Planck18.comoving_distance(z).to(u.Gpc).value + (1+z)*Planck18.hubble_distance.to(u.Gpc).value / Planck18.efunc(z))

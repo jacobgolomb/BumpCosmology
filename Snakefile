@@ -83,3 +83,14 @@ rule sample:
         True
     script:
         "src/scripts/run_fit.py"
+
+rule sample_cosmo:
+    input:
+        "src/data/pe-samples.h5",
+        "src/data/selection-samples.h5"
+    output:
+        "src/data/trace_cosmo.nc"
+    cache:
+        True
+    script:
+        "src/scripts/run_cosmo_fit.py"

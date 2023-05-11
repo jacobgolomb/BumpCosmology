@@ -99,6 +99,8 @@ dependencies:
     - src/data/pe-samples.h5
   src/scripts/dNdm_fitted.py:
     - src/data/trace.nc
+  src/scripts/cosmo_params_corner.py:
+    - src/data/trace_cosmo.nc
 
 # Name of the `.tex` manuscript and corresponding `.pdf` article
 ms_name: ms

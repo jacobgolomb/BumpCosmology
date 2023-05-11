@@ -22,6 +22,7 @@ class ModelParameters(object):
     lam: object = 3.8
     kappa:object = 7.3
     zp: object = 2.0
+    R: object = 2.9
 
 default_parameters = ModelParameters()
 

@@ -101,6 +101,13 @@ dependencies:
     - src/data/trace.nc
   src/scripts/cosmo_params_corner.py:
     - src/data/trace_cosmo.nc
+  src/scrpits/shape_corner.py:
+    - src/data/trace.nc
+  src/scripts/h_zoomin.py:
+    - src/data/trace_cosmo.nc
+  src/scripts/omh2_zoomin.py:
+    - src/data/trace_cosmo.nc
+
 
 # Name of the `.tex` manuscript and corresponding `.pdf` article
 ms_name: ms

@@ -172,3 +172,34 @@ def extract_selection_samples(file, nsamp, desired_pop_wt=None, far_threshold=1,
     
 def dm1qz_dm1dqdl(m1, q, z):
     return (1+z)/(Planck18.comoving_distance(z).to(u.Gpc).value + (1+z)*Planck18.hubble_distance.to(u.Gpc).value / Planck18.efunc(z))
+
+def draw_mock_samples(log_mc_obs, sigma_log_mc, q_obs, sigma_q, log_dl_obs, sigma_log_dl, size=1, output_source_frame=False, rng=None):
+    if rng is None:
+        rng = np.random.default_rng()
+
+    log_mcs = log_mc_obs + sigma_log_mc*rng.normal(size=size)
+
+    qs = q_obs + sigma_q*rng.normal(size=size)
+    while np.any(qs < 0) or np.any(qs > 1):
+        s = (qs < 0) | (qs > 1)
+        qs[s] = q_obs + sigma_q*rng.normal(np.sum(s))
+
+    log_dls = log_dl_obs + sigma_log_dl*rng.normal(size=size)
+
+    mcs = np.exp(log_mcs)
+    m1s = mcs / (qs**(3/5)/(1+q)**(1/5))
+
+    dls = np.exp(log_dls)
+
+    if output_source_frame:
+        zs = np.expm1(np.linspace(0, 10, 1024))
+        ds = Planck18.luminosity_distance(zs).to(u.Gpc).value
+        z = np.interp(dls, ds, zs)
+        m1_source = m1s / (1 + z)
+
+        prior_wt = 1/mcs*qs**(3/5)/(1+q)**(1/5)*(1+z)/dls*(Planck18.comoving_distance(z).to(u.Gpc).value + (1+z)*Planck18.hubble_distance.to(u.Gpc).value/Planck18.efunc(z))
+
+        return m1_source, qs, z, prior_wt
+    else:
+        prior_wt = 1/mcs*qs**(3/5)/(1+q)**(1/5)/dls
+        return m1s, qs, dls, prior_wt

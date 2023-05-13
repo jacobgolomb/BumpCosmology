@@ -102,4 +102,14 @@ rule mock_injections_truth:
         True
     script:
         "src/scripts/mock_injections.py"
+
+rule mock_observations:
+    input:
+        "src/data/mock_injections.h5"
+    output:
+        "src/data/mock_observations.h5"
+    cache:
+        True
+    script:
+        "src/scripts/mock_observations.py"
     

@@ -330,7 +330,8 @@ def make_pop_model(m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel, Ndraw
 
         mu_sel = pt.exp(log_mu_sel)
 
-        R = pm.Normal('R', nobs/mu_sel, pt.sqrt(nobs)/mu_sel)
+        R_unit = pm.Normal('R_unit', 0, 1)
+        R = pm.Deterministic('R', nobs/mu_sel + pt.sqrt(nobs)/mu_sel*R_unit)
 
         _ = pm.Deterministic('neff', pt.exp(2*pt.logsumexp(log_wts, axis=1) - pt.logsumexp(2*log_wts, axis=1)), dims='obs')
 
@@ -414,7 +415,8 @@ def make_pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, 
 
         mu_sel = pt.exp(log_mu_sel)
 
-        R = pm.Normal('R', nobs/mu_sel, pt.sqrt(nobs)/mu_sel)
+        R_unit = pm.Normal('R_unit', 0, 1)
+        R = pm.Deterministic('R', nobs/mu_sel + pt.sqrt(nobs)/mu_sel*R_unit)
 
         _ = pm.Deterministic('neff', pt.exp(2*pt.logsumexp(log_wts, axis=1) - pt.logsumexp(2*log_wts, axis=1)), dims='obs')
 

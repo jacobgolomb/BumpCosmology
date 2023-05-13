@@ -94,3 +94,12 @@ rule sample_cosmo:
         True
     script:
         "src/scripts/run_cosmo_fit.py"
+
+rule mock_injections_truth:
+    output:
+        "src/data/mock_injections.h5"
+    cache:
+        True
+    script:
+        "src/scripts/mock_injections.py"
+    

@@ -6,7 +6,7 @@ import paths
 import seaborn as sns
 import weighting
 
-a, b, mpisn, mbhmax, sigma = weighting.a, weighting.b, weighting.mpisn, weighting.mbhmax, weighting.sigma
+a, b, mpisn, mbhmax, sigma = weighting.default_parameters.a, weighting.default_parameters.b, weighting.default_parameters.mpisn, weighting.default_parameters.mbhmax, weighting.default_parameters.sigma
 
 with sns.color_palette('husl', n_colors=5):
     m = np.linspace(5, 45, 1024)

@@ -107,6 +107,8 @@ dependencies:
     - src/data/trace_cosmo.nc
   src/scripts/omh2_zoomin.py:
     - src/data/trace_cosmo.nc
+  src/scripts/mock_observation_corner.py:
+    - src/data/mock_observations.h5
 
 
 # Name of the `.tex` manuscript and corresponding `.pdf` article

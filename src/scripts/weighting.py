@@ -182,12 +182,12 @@ def draw_mock_samples(log_mc_obs, sigma_log_mc, q_obs, sigma_q, log_dl_obs, sigm
     qs = q_obs + sigma_q*rng.normal(size=size)
     while np.any(qs < 0) or np.any(qs > 1):
         s = (qs < 0) | (qs > 1)
-        qs[s] = q_obs + sigma_q*rng.normal(np.sum(s))
+        qs[s] = q_obs + sigma_q*rng.normal(size=np.sum(s))
 
     log_dls = log_dl_obs + sigma_log_dl*rng.normal(size=size)
 
     mcs = np.exp(log_mcs)
-    m1s = mcs / (qs**(3/5)/(1+q)**(1/5))
+    m1s = mcs / (qs**(3/5)/(1+qs)**(1/5))
 
     dls = np.exp(log_dls)
 
@@ -197,9 +197,9 @@ def draw_mock_samples(log_mc_obs, sigma_log_mc, q_obs, sigma_q, log_dl_obs, sigm
         z = np.interp(dls, ds, zs)
         m1_source = m1s / (1 + z)
 
-        prior_wt = 1/mcs*qs**(3/5)/(1+q)**(1/5)*(1+z)/dls*(Planck18.comoving_distance(z).to(u.Gpc).value + (1+z)*Planck18.hubble_distance.to(u.Gpc).value/Planck18.efunc(z))
+        prior_wt = 1/mcs*qs**(3/5)/(1+qs)**(1/5)*(1+z)/dls*(Planck18.comoving_distance(z).to(u.Gpc).value + (1+z)*Planck18.hubble_distance.to(u.Gpc).value/Planck18.efunc(z))
 
         return m1_source, qs, z, prior_wt
     else:
-        prior_wt = 1/mcs*qs**(3/5)/(1+q)**(1/5)/dls
+        prior_wt = 1/mcs*qs**(3/5)/(1+qs)**(1/5)/dls
         return m1s, qs, dls, prior_wt

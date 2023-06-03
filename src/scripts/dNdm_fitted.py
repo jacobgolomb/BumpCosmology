@@ -1,4 +1,5 @@
 import arviz as az
+from intensity_models import coords
 import matplotlib.pyplot as plt
 import numpy as np
 import os.path as op
@@ -18,7 +19,7 @@ if __name__ == '__main__':
     ll = dN.quantile(0.025, dim=d)
     hh = dN.quantile(0.975, dim=d)
 
-    x = dN.coords['m_grid']
+    x = coords['m_grid']
 
     line, = plt.plot(x[1:], m[1:])
     plt.fill_between(x[1:], h[1:], l[1:], color=line.get_color(), alpha=0.25)

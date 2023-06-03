@@ -5,9 +5,8 @@ import dataclasses
 from dataclasses import dataclass
 import h5py
 import intensity_models
+import jax.numpy as jnp
 import numpy as np
-import pytensor
-import pytensor.tensor as pt
 
 @dataclass
 class ModelParameters(object):
@@ -26,10 +25,7 @@ class ModelParameters(object):
 
 default_parameters = ModelParameters()
 
-m = pt.dvector('m1')
-q = pt.dvector('q')
-z = pt.dvector('z')
-default_log_dNdmdqdV = pytensor.function([m,q,z], intensity_models.LogDNDMDQDV(default_parameters.a, default_parameters.b, default_parameters.c, default_parameters.mpisn, default_parameters.mbhmax, default_parameters.sigma, default_parameters.fpl, default_parameters.beta, default_parameters.lam, default_parameters.kappa, default_parameters.zp)(m,q,z))
+default_log_dNdmdqdV = intensity_models.LogDNDMDQDV(default_parameters.a, default_parameters.b, default_parameters.c, default_parameters.mpisn, default_parameters.mbhmax, default_parameters.sigma, default_parameters.fpl, default_parameters.beta, default_parameters.lam, default_parameters.kappa, default_parameters.zp)
 default_log_dNdmdqdV.__doc__ = r"""
 Default mass-redshift distribution, more-or-less a reasonable fit to O3a.
 """
@@ -177,14 +173,14 @@ def draw_mock_samples(log_mc_obs, sigma_log_mc, q_obs, sigma_q, log_dl_obs, sigm
     if rng is None:
         rng = np.random.default_rng()
 
-    log_mcs = log_mc_obs + sigma_log_mc*rng.normal(size=size)
+    log_mcs = rng.normal(loc=log_mc_obs, scale=sigma_log_mc, size=size)
 
-    qs = q_obs + sigma_q*rng.normal(size=size)
+    qs = rng.normal(loc=q_obs, scale=sigma_q, size=size)
     while np.any(qs < 0) or np.any(qs > 1):
         s = (qs < 0) | (qs > 1)
-        qs[s] = q_obs + sigma_q*rng.normal(size=np.sum(s))
+        qs[s] = rng.normal(loc=q_obs, scale=sigma_q, size=np.sum(s))
 
-    log_dls = log_dl_obs + sigma_log_dl*rng.normal(size=size)
+    log_dls = rng.normal(loc=log_dl_obs, scale=sigma_log_dl, size=size)
 
     mcs = np.exp(log_mcs)
     m1s = mcs / (qs**(3/5)/(1+qs)**(1/5))
@@ -192,11 +188,15 @@ def draw_mock_samples(log_mc_obs, sigma_log_mc, q_obs, sigma_q, log_dl_obs, sigm
     dls = np.exp(log_dls)
 
     if output_source_frame:
-        zs = np.expm1(np.linspace(0, 10, 1024))
+        zs = np.expm1(np.linspace(np.log(1), np.log(1+10), 1024))
         ds = Planck18.luminosity_distance(zs).to(u.Gpc).value
         z = np.interp(dls, ds, zs)
         m1_source = m1s / (1 + z)
 
+        # Flat in log(Mc), q, log(d), so prior is the product of three terms:
+        # d log(Mc) / d m1_source = 1/Mc q^(3/5)/(1+q)^(1/5) (1 + z)
+        # 1
+        # d log(dl) / dz = 1/dl (dC + (1+z)*dH/E(z))
         prior_wt = 1/mcs*qs**(3/5)/(1+qs)**(1/5)*(1+z)/dls*(Planck18.comoving_distance(z).to(u.Gpc).value + (1+z)*Planck18.hubble_distance.to(u.Gpc).value/Planck18.efunc(z))
 
         return m1_source, qs, z, prior_wt

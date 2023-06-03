@@ -1,20 +1,24 @@
+ndevice = 8
+import numpyro
+numpyro.set_host_device_count(ndevice)
+
 import arviz as az
 from astropy.cosmology import Planck18
 import astropy.units as u
 import intensity_models
+import jax
 import numpy as np
+from numpyro.infer import MCMC, NUTS
 import os.path as op
 import pandas as pd
 import paths
-import pymc as pm
 import weighting
 
 nmcmc = 1000
 nchain = 4
+random_seed = 1652819403
 
 if __name__ == '__main__':
-    random_seed = 330601005597653222525092651948614145425
-
     pe_samples = pd.read_hdf(op.join(paths.data, 'pe-samples.h5'), 'samples')
     pe_samples['m1d'] = pe_samples['m1']*(1+pe_samples['z'])
     pe_samples['dl'] = Planck18.luminosity_distance(pe_samples['z'].to_numpy()).to(u.Gpc).value
@@ -38,9 +42,12 @@ if __name__ == '__main__':
 
     m1s, qs, dls, pdraws = map(np.array, [m1s, qs, dls, pdraws])
 
-    model = intensity_models.make_pop_cosmo_model(m1s, qs, dls, pdraws, 
-                                                  sel_samples['m1d'], sel_samples['q'], sel_samples['dl'], sel_samples['pdraw_cosmo'], sel_samples['ndraw'].iloc[0])
+    kernel = NUTS(intensity_models.pop_cosmo_model)
+    mcmc = MCMC(kernel, num_warmup=nmcmc, num_samples=nmcmc, num_chains=nchain)
+    mcmc.run(jax.random.PRNGKey(random_seed),
+             m1s, qs, dls, pdraws,
+             sel_samples['m1d'], sel_samples['q'], sel_samples['dl'], sel_samples['pdraw_cosmo'], sel_samples['ndraw'].iloc[0])
     
-    with model:
-        trace = pm.sample(tune=nmcmc, draws=nmcmc, chains=nchain, random_seed=random_seed)
+    trace = az.from_numpyro(mcmc)
+
     az.to_netcdf(trace, op.join(paths.data, 'trace_cosmo.nc'))

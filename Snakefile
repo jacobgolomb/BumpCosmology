@@ -112,4 +112,15 @@ rule mock_observations:
         True
     script:
         "src/scripts/mock_observations.py"
+
+rule mock_year_samples:
+    input:
+        "src/data/mock_injections.h5",
+        "src/data/mock_observations.h5"
+    output:
+        "src/data/mock_year_samples.h5"
+    cache:
+        True
+    script:
+        "src/scripts/mock_one_year_samples.py"
     

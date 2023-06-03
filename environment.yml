@@ -1,3 +1,4 @@
+name: BumpCosmology
 channels:
   - conda-forge
   - defaults
@@ -6,12 +7,12 @@ dependencies:
   - astropy
   - h5py
   - ipywidgets
-  - numpy
+  - jax
   - jupyterlab
   - lalsuite
   - matplotlib
-  - pymc=5
+  - numpy
+  - numpyro
   - pytables
-  - pytensor
   - seaborn
   - tqdm

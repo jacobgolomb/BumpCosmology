@@ -33,7 +33,7 @@ Default mass-redshift distribution, more-or-less a reasonable fit to O3a.
 def default_pop_wt(m1, q, z):
     """Weights in `(m1,q,z)` corresponding to the :func:`default_log_dNdmdqdV`."""
     log_dN = default_log_dNdmdqdV(m1, q, z)
-    return np.exp(log_dN)*Planck18.differential_comoving_volume(z).to(u.Gpc**3/u.sr).value/(1+z)
+    return 4*np.pi*np.exp(log_dN)*Planck18.differential_comoving_volume(z).to(u.Gpc**3/u.sr).value/(1+z)
 
 def li_prior_wt(m1, q, z, cosmology_weighted=False):
     """Returns LALInference/Bilby prior over `m1`, `q`, and `z`.
@@ -194,12 +194,12 @@ def draw_mock_samples(log_mc_obs, sigma_log_mc, q_obs, sigma_q, log_dl_obs, sigm
         m1_source = m1s / (1 + z)
 
         # Flat in log(Mc), q, log(d), so prior is the product of three terms:
-        # d log(Mc) / d m1_source = 1/Mc q^(3/5)/(1+q)^(1/5) (1 + z)
+        # d log(Mc) / d m1_source = 1/m1_source
         # 1
         # d log(dl) / dz = 1/dl (dC + (1+z)*dH/E(z))
-        prior_wt = 1/mcs*qs**(3/5)/(1+qs)**(1/5)*(1+z)/dls*(Planck18.comoving_distance(z).to(u.Gpc).value + (1+z)*Planck18.hubble_distance.to(u.Gpc).value/Planck18.efunc(z))
+        prior_wt = 1/m1_source/dls*(Planck18.comoving_distance(z).to(u.Gpc).value + (1+z)*Planck18.hubble_distance.to(u.Gpc).value/Planck18.efunc(z))
 
         return m1_source, qs, z, prior_wt
     else:
-        prior_wt = 1/mcs*qs**(3/5)/(1+qs)**(1/5)/dls
+        prior_wt = 1/m1s/dls
         return m1s, qs, dls, prior_wt

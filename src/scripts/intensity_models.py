@@ -49,7 +49,7 @@ def log_smooth_turnon(m, mmin, width=0.05):
     """
     dm = mmin*width
 
-    return np.log(2) -jnp.log1p(jnp.exp(-(m-mmin)/dm))
+    return np.log(2) - jnp.log1p(jnp.exp(-(m-mmin)/dm))
 
 @dataclass
 class LogDNDMPISN(object):
@@ -443,6 +443,38 @@ coords = {
     'z_grid': np.expm1(np.linspace(np.log1p(0), np.log1p(3), 128))
 }
 
+def mass_parameters():
+    a = numpyro.sample('a', dist.TruncatedNormal(2.35, 2, low=-1.65, high=6.35))
+    b = numpyro.sample('b', dist.TruncatedNormal(1.9, 2, low=-2.1, high=5.9))
+    c = numpyro.sample('c', dist.TruncatedNormal(4, 2, low=0, high=8))
+
+    mpisn = numpyro.sample('mpisn', dist.TruncatedNormal(35.0, 5.0, low=20.0, high=50.0))
+    dmbhmax = numpyro.sample('dmbhmax', dist.TruncatedNormal(5.0, 2.0, low=0.5, high=11.0))
+    mbhmax = numpyro.deterministic('mbhmax', mpisn + dmbhmax)
+    sigma = numpyro.sample('sigma', dist.TruncatedNormal(2, 2, low=1))
+
+    beta = numpyro.sample('beta', dist.Normal(0, 2))
+
+    log_fpl = numpyro.sample('log_fpl', dist.Uniform(np.log(1e-3), np.log(0.5)))
+    fpl = numpyro.deterministic('fpl', jnp.exp(log_fpl))
+
+    return a,b,c,mpisn,mbhmax,sigma,beta,fpl
+
+def redshift_parameters():
+    lam = numpyro.sample('lam', dist.TruncatedNormal(2.7, 2.0, low=-1.3, high=6.7))
+    dkappa = numpyro.sample('dkappa', dist.TruncatedNormal(5.6-2.7, 2.0, low=1, high=9.6-2.7))
+    kappa = numpyro.deterministic('kappa', lam + dkappa)
+    zp = numpyro.sample('zp', dist.TruncatedNormal(1.9, 1, low=0, high=3.9))
+
+    return lam,kappa,zp
+
+def cosmo_parameters():
+    h = numpyro.sample('h', dist.TruncatedNormal(0.7, 0.2, low=0.35, high=1.4))
+    Om = numpyro.sample('Om', dist.TruncatedNormal(0.3, 0.15, low=0, high=1))
+    w = numpyro.sample('w', dist.TruncatedNormal(-1, 0.25, low=-1.5, high=-0.5))
+
+    return h,Om,w
+
 def pop_model(m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel, Ndraw):
     m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel = map(jnp.array, (m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel))
 
@@ -458,24 +490,9 @@ def pop_model(m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel, Ndraw):
     zinterp = np.expm1(np.linspace(np.log1p(0), np.log1p(zmax), 1024))
     dVdzdt_interp = 4*np.pi*Planck18.differential_comoving_volume(zinterp).to(u.Gpc**3/u.sr).value/(1+zinterp)
     
-    a = numpyro.sample('a', dist.Normal(2.35, 2))
-    b = numpyro.sample('b', dist.Normal(1.9, 2))
-    c = numpyro.sample('c', dist.Normal(4, 2))
+    a,b,c,mpisn,mbhmax,sigma,beta,fpl = mass_parameters()
 
-    mpisn = numpyro.sample('mpisn', dist.Normal(35.0, 5.0))
-    dmbhmax = numpyro.sample('dmbhmax', dist.TruncatedNormal(5.0, 2.0, low=0.0))
-    mbhmax = numpyro.deterministic('mbhmax', mpisn + dmbhmax)
-    sigma = numpyro.sample('sigma', dist.TruncatedNormal(2, 2, low=1))
-
-    beta = numpyro.sample('beta', dist.Normal(0, 2))
-
-    log_fpl = numpyro.sample('log_fpl', dist.Uniform(np.log(1e-3), np.log(0.5)))
-    fpl = numpyro.deterministic('fpl', jnp.exp(log_fpl))
-        
-    lam = numpyro.sample('lam', dist.Normal(2.7, 2.0))
-    dkappa = numpyro.sample('dkappa', dist.TruncatedNormal(5.6-2.7, 2.0, low=1))
-    kappa = numpyro.deterministic('kappa', lam + dkappa)
-    zp = numpyro.sample('zp', dist.TruncatedNormal(1.9, 1, low=0))
+    lam,kappa,zp = redshift_parameters()
 
     log_dN = LogDNDMDQDV(a, b, c, mpisn, mbhmax, sigma, fpl, beta, lam, kappa, zp)
 
@@ -513,9 +530,7 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
     log_pdraw = jnp.log(pdraw)
     log_pdraw_sel = jnp.log(pdraw_sel)
 
-    h = numpyro.sample('h', dist.TruncatedNormal(0.7, 0.2, low=0.35, high=1.4))
-    Om = numpyro.sample('Om', dist.TruncatedNormal(0.3, 0.15, low=0, high=1))
-    w = numpyro.sample('w', dist.TruncatedNormal(-1, 0.25, low=-1.5, high=-0.5))
+    h,Om,w = cosmo_parameters()
 
     a = numpyro.sample('a', dist.Normal(2.35, 2))
     b = numpyro.sample('b', dist.Normal(1.9, 2))
@@ -531,14 +546,11 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
     log_fpl = numpyro.sample('log_fpl', dist.Uniform(np.log(1e-3), np.log(0.5)))
     fpl = numpyro.deterministic('fpl', jnp.exp(log_fpl))
     
-    lam = numpyro.sample('lam', dist.Normal(2.7, 2.0))
-    dkappa = numpyro.sample('dkappa', dist.TruncatedNormal(5.6-2.7, 2.0, low=1))
-    kappa = numpyro.deterministic('kappa', lam + dkappa)
-    zp = numpyro.sample('zp', dist.TruncatedNormal(1.9, 1, low=0))
+    lam,kappa,zp = redshift_parameters()
 
     cosmo = FlatwCDMCosmology(h, Om, w)
 
-    if not evolve:
+    if not evolution:
         log_dN = LogDNDMDQDV(a, b, c, mpisn, mbhmax, sigma, fpl, beta, lam, kappa, zp)
     else:
         mpisndot = numpyro.sample('mpisndot', dist.TruncatedNormal(4, 2, low=0) )

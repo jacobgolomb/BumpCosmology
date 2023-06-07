@@ -10,6 +10,8 @@ import numpyro
 import numpyro.distributions as dist
 from utils import jnp_cumtrapz
 
+mbh_min = 5.0
+
 def mean_mbh_from_mco(mco, mpisn, mbhmax):
     """The mean black hole mass from the core-mass to remnant-mass relation.
     
@@ -255,6 +257,7 @@ class LogDNDM(object):
     mbhmax: object
     sigma: object
     fpl: object
+    mbh_min: object = mbh_min
     mref: object = 30.0
     log_norm: object = 0.0
     log_pl_norm: object = dataclasses.field(init=False)
@@ -275,6 +278,8 @@ class LogDNDM(object):
         log_dNdm = jnp.where(m >= self.log_dndm_pisn.mbh_grid[-1], np.NINF, log_dNdm)
 
         log_dNdm = jnp.logaddexp(log_dNdm, -self.c*jnp.log(m/self.mbhmax) + self.log_pl_norm + log_smooth_turnon(m, self.mbhmax))
+
+        log_dNdm = jnp.where(m < self.mbh_min, np.NINF, log_dNdm)
 
         return log_dNdm + self.log_norm
     
@@ -324,8 +329,8 @@ class LogDNDMDQDV(object):
 
 
     def __post_init__(self):
-        self.log_dndm = LogDNDM(self.a, self.b, self.c, self.mpisn, self.mbhmax, self.sigma, self.fpl, self.mref)
-        self.log_dndv = LogDNDV(self.lam, self.kappa, self.zp, self.zref)
+        self.log_dndm = LogDNDM(self.a, self.b, self.c, self.mpisn, self.mbhmax, self.sigma, self.fpl, mref=self.mref)
+        self.log_dndv = LogDNDV(self.lam, self.kappa, self.zp, zref=self.zref)
 
     def __call__(self, m1, q, z):
         m1 = jnp.array(m1)

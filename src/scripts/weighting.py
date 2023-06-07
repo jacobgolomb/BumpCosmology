@@ -101,6 +101,10 @@ def extract_posterior_samples(file, nsamp, desired_pop_wt=None, rng=None):
         q = np.array(samples['mass_ratio'])
         z = np.array(samples['redshift'])
 
+        m2 = q*m1
+        if np.median(m2) < intensity_models.mbh_min:
+            raise ValueError(f'rejecting {file} because median m2 < {intensity_models.mbh_min} MSun')
+
         if desired_pop_wt is None:
             pop_wt = li_prior_wt(m1, q, z)
         else:
@@ -109,7 +113,7 @@ def extract_posterior_samples(file, nsamp, desired_pop_wt=None, rng=None):
         wt = wt / np.sum(wt)
 
         ns = 1/np.sum(wt*wt)
-        if ns < nsamp:
+        if ns < 2*nsamp:
             raise ValueError('could not read samples from {:s} due to too few samples: {:.1f}'.format(file, ns))
 
         inds = rng.choice(np.arange(len(samples)), nsamp, p=wt)

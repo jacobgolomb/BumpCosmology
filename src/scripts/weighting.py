@@ -10,18 +10,18 @@ import numpy as np
 
 @dataclass
 class ModelParameters(object):
-    a: object = 1.2
-    b: object  = -0.35
-    c: object = 2.1
-    mpisn: object = 33.0
-    mbhmax: object = 37.0
-    sigma: object = 3.6
-    fpl: object = 0.19
-    beta: object = -1.7
-    lam: object = 3.8
-    kappa:object = 7.3
-    zp: object = 2.0
-    R: object = 2.9
+    a: object = 1.8
+    b: object  = -0.71
+    c: object = 2.9
+    mpisn: object = 31.0
+    mbhmax: object = 36.0
+    sigma: object = 2.3
+    fpl: object = 0.21
+    beta: object = -2.2
+    lam: object = 4.7
+    kappa:object = 7.0
+    zp: object = 3.0
+    R: object = 2.3
 
 default_parameters = ModelParameters()
 
@@ -170,7 +170,7 @@ def extract_selection_samples(file, nsamp, desired_pop_wt=None, far_threshold=1,
 
         return m1s_sel_cut, qs_sel_cut, zs_sel_cut, pdraw_sel_cut, ndraw_cut
     
-def dm1qz_dm1dqdl(m1, q, z):
+def dm1sqz_dm1ddqdl(m1, q, z):
     return (1+z)/(Planck18.comoving_distance(z).to(u.Gpc).value + (1+z)*Planck18.hubble_distance.to(u.Gpc).value / Planck18.efunc(z))
 
 def draw_mock_samples(log_mc_obs, sigma_log_mc, q_obs, sigma_q, log_dl_obs, sigma_log_dl, size=1, output_source_frame=False, rng=None):

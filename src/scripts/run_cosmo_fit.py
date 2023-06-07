@@ -22,12 +22,12 @@ if __name__ == '__main__':
     pe_samples = pd.read_hdf(op.join(paths.data, 'pe-samples.h5'), 'samples')
     pe_samples['m1d'] = pe_samples['m1']*(1+pe_samples['z'])
     pe_samples['dl'] = Planck18.luminosity_distance(pe_samples['z'].to_numpy()).to(u.Gpc).value
-    pe_samples['pdraw_cosmo'] = pe_samples['wt']*weighting.dm1qz_dm1dqdl(pe_samples['m1'], pe_samples['q'], pe_samples['z'])
+    pe_samples['pdraw_cosmo'] = pe_samples['wt']*weighting.dm1sqz_dm1ddqdl(pe_samples['m1'], pe_samples['q'], pe_samples['z'])
 
     sel_samples = pd.read_hdf(op.join(paths.data, 'selection-samples.h5'), 'samples')
     sel_samples['m1d'] = sel_samples['m1']*(1+sel_samples['z'])
     sel_samples['dl'] = Planck18.luminosity_distance(sel_samples['z'].to_numpy()).to(u.Gpc).value
-    sel_samples['pdraw_cosmo'] = sel_samples['pdraw']*weighting.dm1qz_dm1dqdl(sel_samples['m1'], sel_samples['q'], sel_samples['z'])
+    sel_samples['pdraw_cosmo'] = sel_samples['pdraw']*weighting.dm1sqz_dm1ddqdl(sel_samples['m1'], sel_samples['q'], sel_samples['z'])
 
     evts = pe_samples.groupby('evt')
     m1s = []

@@ -8,7 +8,7 @@ import re
 import tqdm
 import weighting
 
-nsamp = 256
+nsamp = 128
 
 if __name__ == '__main__':
     rng = np.random.default_rng(232970088789901018827685773729153268726)

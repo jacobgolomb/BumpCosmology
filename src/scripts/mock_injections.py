@@ -112,8 +112,6 @@ if __name__ == '__main__':
             pdraw = 1/(150-5)*1*1/2.75
 
             wt = weighting.default_pop_wt(m, q, z)
-
-            wt[m*q < 5] = 0 # Cut out events with m2 < 5
             wt_sum += np.sum(wt/pdraw)
 
             r = rng.uniform(low=0, high=np.max(wt), size=nbatch)

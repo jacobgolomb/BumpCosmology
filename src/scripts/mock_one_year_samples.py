@@ -16,26 +16,34 @@ if __name__ == '__main__':
     nex = 4*np.pi*weighting.default_parameters.R*np.sum(np.exp(weighting.default_log_dNdmdqdV(obs['m1'], obs['q'], obs['z']))*Planck18.differential_comoving_volume(obs['z']).to(u.Gpc**3/u.sr).value/(1+obs['z'])/obs['pdraw_mqz'])/len(inj)
 
     n = rng.poisson(nex)
+    wt = weighting.default_pop_wt(obs['m1'], obs['q'], obs['z']) / obs['pdraw_mqz']
+    inds = rng.choice(len(obs), size=n, p=wt / np.sum(wt), replace=False)
 
     nsamp = 128
     df = pd.DataFrame()
     for i in tqdm(range(n)):
-        row = obs.iloc[i]
+        evt = inds[i]
+        row = obs.iloc[evt]
 
-        m,q,z,w = weighting.draw_mock_samples(row['log_mc_obs'], row['sigma_log_mc'], 
-                                              row['q_obs'], row['sigma_q'],
-                                              row['log_dl_obs'], row['sigma_log_dl'],
-                                              size=128*nsamp, rng=rng, 
-                                              output_source_frame=True)
+        size = 32*nsamp
+        while True:
+            m,q,z,w = weighting.draw_mock_samples(row['log_mc_obs'], row['sigma_log_mc'], 
+                                                  row['q_obs'], row['sigma_q'],
+                                                  row['log_dl_obs'], row['sigma_log_dl'],
+                                                  size=size, rng=rng, 
+                                                  output_source_frame=True)
+            
+            pop_wt = weighting.default_pop_wt(m,q,z)
+            wt = pop_wt/w
+            ne = np.square(np.sum(wt))/np.sum(np.square(wt))
+            if ne < 2*nsamp:
+                print(f'continuing because neff = {ne:.1f} < {2*nsamp=}')
+                size = size*2
+                continue
         
-        pop_wt = weighting.default_pop_wt(m,q,z)
-        wt = pop_wt/w
-        ne = np.square(np.sum(wt))/np.sum(np.square(wt))
-        if ne < 2*nsamp:
-            raise ValueError(f'not enough effective samples {ne:.1f} for event {i}')
-        
-        inds = rng.choice(np.arange(128*nsamp), size=nsamp, p=wt / np.sum(wt))
+            samp_inds = rng.choice(np.arange(len(wt)), size=nsamp, p=wt / np.sum(wt))
 
-        df = pd.concat((df, pd.DataFrame({'m1': m[inds], 'q': q[inds], 'z': z[inds], 'wt': pop_wt[inds], 'evt': i})), ignore_index=True)
+            df = pd.concat((df, pd.DataFrame({'m1': m[samp_inds], 'q': q[samp_inds], 'z': z[samp_inds], 'wt': pop_wt[samp_inds], 'evt': evt})), ignore_index=True)
+            break
     
     df.to_hdf(op.join(paths.data, 'mock_year_samples.h5'), key='samples')

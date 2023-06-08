@@ -207,3 +207,20 @@ def draw_mock_samples(log_mc_obs, sigma_log_mc, q_obs, sigma_q, log_dl_obs, sigm
     else:
         prior_wt = 1/m1s/dls
         return m1s, qs, dls, prior_wt
+    
+def resample_injections(m1, q, z, pd, nd, wt_fn, rng=None):
+    m1, q, z, pd = map(np.array, [m1, q, z, pd])
+    
+    if rng is None:
+        rng = np.random.default_rng()
+
+    pop_wt_unnorm = wt_fn(m1, q, z)
+    wt_unnorm = pop_wt_unnorm / pd
+    norm = np.sum(wt_unnorm) / nd
+
+    ne = np.square(np.sum(wt_unnorm)) / np.sum(np.square(wt_unnorm))
+
+    inds = rng.choice(len(wt_unnorm), size=int(round(ne)), p=wt_unnorm/np.sum(wt_unnorm))
+    pop_wt_norm = pop_wt_unnorm / norm
+
+    return m1[inds], q[inds], z[inds], pop_wt_norm[inds], ne

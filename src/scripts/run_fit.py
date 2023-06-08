@@ -32,7 +32,7 @@ if __name__ == '__main__':
 
     m1s, qs, zs, pdraws = map(np.array, [m1s, qs, zs, pdraws])
 
-    kernel = NUTS(intensity_models.pop_model)
+    kernel = NUTS(intensity_models.pop_model, dense_mass=True)
     mcmc = MCMC(kernel, num_warmup=nmcmc, num_samples=nmcmc, num_chains=nchain)
     mcmc.run(jax.random.PRNGKey(random_seed), 
              m1s, qs, zs, pdraws, 

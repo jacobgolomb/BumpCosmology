@@ -38,29 +38,13 @@ if __name__ == '__main__':
     inj_det['dl'] = Planck18.luminosity_distance(inj_det['z'].to_numpy()).to(u.Gpc).value
     inj_det['mc_det'] = inj_det['mc'] * (1 + inj_det['z'])
 
-    log_mc_obs = []
-    sigma_log_mc = []
-    q_obs = []
-    sigma_q = []
-    log_dl_obs = []
-    sigma_log_dl = []
-    for i, row in tqdm(inj_det.iterrows()):
-        uncert = Uncertainties.from_snr(row['SNR_OBS'])
-        
-        log_mc_obs.append(np.log(row['mc_det']) + uncert.sigma_log_mc*rng.normal())
-        sigma_log_mc.append(uncert.sigma_log_mc)
+    inj_det['sigma_log_mc'] = 0.05*20/inj_det['SNR_OBS']
+    inj_det['log_mc_obs'] = rng.normal(loc=np.log(inj_det['mc_det']), scale=inj_det['sigma_log_mc'])
 
-        q_obs.append(row['q'] + uncert.sigma_q*rng.normal())
-        sigma_q.append(uncert.sigma_q)
+    inj_det['sigma_q'] = 0.07*20/inj_det['SNR_OBS']
+    inj_det['q_obs'] = rng.normal(loc=inj_det['q'], scale=inj_det['sigma_q'])
 
-        log_dl_obs.append(np.log(row['dl']) + uncert.sigma_log_dl*rng.normal())
-        sigma_log_dl.append(uncert.sigma_log_dl)
-
-    inj_det['log_mc_obs'] = log_mc_obs
-    inj_det['sigma_log_mc'] = sigma_log_mc
-    inj_det['q_obs'] = q_obs
-    inj_det['sigma_q'] = sigma_q
-    inj_det['log_dl_obs'] = log_dl_obs
-    inj_det['sigma_log_dl'] = sigma_log_dl
+    inj_det['sigma_log_dl'] = 0.2*20/inj_det['SNR_OBS']
+    inj_det['log_dl_obs'] = rng.normal(loc=np.log(inj_det['dl']), scale=inj_det['sigma_log_dl'])
 
     inj_det.to_hdf(op.join(paths.data, 'mock_observations.h5'), key='observations')

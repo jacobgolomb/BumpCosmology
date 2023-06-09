@@ -7,6 +7,7 @@ import numpy as np
 import os.path as op
 import pandas as pd
 import paths
+import scipy.integrate as sint
 import scipy.interpolate as si
 from tqdm import tqdm
 import weighting
@@ -20,14 +21,21 @@ def next_pow_2(x):
 def line_between(z0, y0, z1, y1):
     return lambda z: (z-z1)*y0/(z0-z1) + (z-z0)*y1/(z1-z0)
 
-mz_low = line_between(0.5, 5, 2.5, 30)
-mz_high = line_between(0, 1000.0, 2.5, 50)
-qz_low = line_between(0.6, 0.0, 2.6, 1)
+# mz_low = line_between(0.5, 5, 2.5, 30)
+# mz_high = line_between(0, 1000.0, 2.5, 50)
+# qz_low = line_between(0.6, 0.0, 2.6, 1)
+
+z_horiz = 3.6
+chirp_dist_min = 1.6
 
 def compute_snrs(ir):
     i, r = ir
     m2s = r.m1*r.q
-    if r.m1 > mz_low(r.z) and r.q > qz_low(r.z) and r.m1 < mz_high(r.z) and m2s > 5:
+
+    mcds = r.m1*(1+r.z)*r.q**(3/5)/(1+r.q)**(1/5)
+    chirp_d = mcds**(5/6) / Planck18.luminosity_distance(r.z).to(u.Gpc).value
+
+    if r.z < z_horiz and chirp_d > chirp_dist_min:
         m1d = r.m1*(1+r.z)
         m2d = m2s*(1+r.z)
 
@@ -72,16 +80,75 @@ def compute_snrs(ir):
     else:
         return (0.0, 0.0, 0.0, 0.0)
 
-ndraw = 1000000
+class ZPDF(object):
+    def __init__(self):
+        self.lam = 2.7
+        self.kappa = 5.6
+        self.zp = 1.9
+
+        self.zmax = z_horiz
+
+        self.zinterp = np.expm1(np.linspace(np.log(1), np.log(1+self.zmax), 1024))
+        self.norm = 1
+        unnorm_pdf = self(self.zinterp)
+        
+        self.norm = 1/np.trapz(unnorm_pdf, self.zinterp)
+        self.pdfinterp = unnorm_pdf * self.norm
+
+        self.cdfinterp = sint.cumtrapz(self.pdfinterp, self.zinterp, initial=0)
+
+    def __call__(self, z):
+        return self.norm*(1+z)**self.lam / (1 + ((1+z)/(1+self.zp))**self.kappa) * Planck18.differential_comoving_volume(z).to(u.Gpc**3/u.sr).value/(1+z)
+    
+    def icdf(self, c):
+        return np.interp(c, self.cdfinterp, self.zinterp)
+    
+class InterpolatedPDF(object):
+    def __init__(self, xs, cdfs):
+        self.xs = xs
+        self.cdfs = cdfs / cdfs[-1]
+        self.pdfs = np.diff(cdfs) / np.diff(xs)
+
+    def __call__(self, x):
+        x = np.atleast_1d(x)
+        i = np.searchsorted(self.xs, x)-1
+
+        return self.pdfs[i]
+    
+    def icdf(self, c):
+        return np.interp(c, self.cdfs, self.xs)
+        
+
+
+ndraw = 10000000
 
 if __name__ == '__main__':
     rng = np.random.default_rng(333165393797366967556667466879860422123)
 
     with Pool() as pool:
         df = pd.DataFrame(columns = ['m1', 'q', 'z', 'iota', 'ra', 'dec', 'psi', 'gmst', 's1x', 's1y', 's1z', 's2x', 's2y', 's2z', 'pdraw_mqz', 'SNR_H1', 'SNR_L1', 'SNR_V1', 'SNR'])
-        m = 5/(1-rng.uniform(low=0, high=1, size=ndraw)) # p(m) = 1/5 (5/m)^2
-        q = rng.uniform(low=0, high=1, size=ndraw)
-        z = rng.uniform(low=0, high=2.75, size=ndraw)
+
+        # We want to draw from p(m1) ~ m1^(-2), p(mtotal | m1) ~ mtotal^-2, p(z) ~ (1+z)^2.7/(1 + ((1+z)/(1+zp))^(5.6))
+        zpdf = InterpolatedPDF(np.array([0.0, 0.38128367, 0.49570627, 0.58798213, 0.67359856,
+                                         0.75981976, 0.85396694, 0.96128184, 1.0959582 , 1.30049102,
+                                         z_horiz]),
+                               np.array([0. , 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1. ]))
+        mpdf = InterpolatedPDF(np.array([  5.0,  77.76163523, 106.05160614, 133.58633639,  
+                                         162.49210338, 194.67277074, 231.51827661, 273.80747305,
+                                         326.16370407, 395.48583316, 500.0]),
+                               np.array([0. , 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1. ]))
+        qscaledpdf = InterpolatedPDF(np.array([1.89065178e-04, 2.17933001e-01, 3.26107302e-01, 4.20002256e-01,
+                                               5.04506939e-01, 5.90430153e-01, 6.72685048e-01, 7.52949753e-01,
+                                               8.37576519e-01, 9.18350223e-01, 9.99968397e-01]),
+                                     np.array([0. , 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1. ]))
+
+        m = mpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
+        qscaled = qscaledpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
+        z = zpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
+
+        q = qscaled*(1-5/m) + 5/m
+
+        pdraw = mpdf(m)*qscaledpdf(qscaled)*zpdf(z)/(1-5/m)
 
         iota = np.arccos(rng.uniform(low=-1, high=1, size=ndraw))
 
@@ -94,8 +161,6 @@ if __name__ == '__main__':
 
         s1x, s1y, s1z = rng.normal(loc=0, scale=0.2/np.sqrt(3), size=(3, ndraw))
         s2x, s2y, s2z = rng.normal(loc=0, scale=0.2/np.sqrt(3), size=(3, ndraw))
-
-        pdraw = 1/5*np.square(5/m)/2.75
 
         df = pd.DataFrame({
             'm1': m,
@@ -132,3 +197,4 @@ if __name__ == '__main__':
     print('Found {:d} injections with SNR > 10'.format(np.sum(df['SNR'] > 10)))
     print('Predicting {:.0f} detections per year'.format(nex))
     print('Neff from default pop model = {:.1f}'.format(np.square(np.sum(wt))/np.sum(np.square(wt))))
+    print('Expected number of pop-model draws = {:.1f}'.format(np.sum(wt)/np.max(wt)))

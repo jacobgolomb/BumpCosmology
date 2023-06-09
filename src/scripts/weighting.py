@@ -171,6 +171,12 @@ def extract_selection_samples(file, nsamp, desired_pop_wt=None, far_threshold=1,
         return m1s_sel_cut, qs_sel_cut, zs_sel_cut, pdraw_sel_cut, ndraw_cut
     
 def dm1sqz_dm1ddqdl(m1, q, z):
+    r"""Jacobian from source-frame to detector-frame quantities.
+
+    .. math::
+
+        \frac{\partial \left( m_{1,\mathrm{source}}, q, z \right)}{\left( m_{1,\mathrm{det}}, q, d_L \right)}    
+    """
     return (1+z)/(Planck18.comoving_distance(z).to(u.Gpc).value + (1+z)*Planck18.hubble_distance.to(u.Gpc).value / Planck18.efunc(z))
 
 def draw_mock_samples(log_mc_obs, sigma_log_mc, q_obs, sigma_q, log_dl_obs, sigma_log_dl, size=1, output_source_frame=False, rng=None):
@@ -210,7 +216,7 @@ def draw_mock_samples(log_mc_obs, sigma_log_mc, q_obs, sigma_q, log_dl_obs, sigm
     
 def resample_injections(m1, q, z, pd, nd, wt_fn, rng=None):
     m1, q, z, pd = map(np.array, [m1, q, z, pd])
-    
+
     if rng is None:
         rng = np.random.default_rng()
 

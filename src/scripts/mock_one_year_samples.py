@@ -8,7 +8,7 @@ from tqdm import tqdm
 import weighting
 
 if __name__ == '__main__':
-    rng = np.random.default_rng(177043409333769410879087781513332130228)
+    rng = np.random.default_rng(177043409333769410879087781513332130230)
 
     inj = pd.read_hdf(op.join(paths.data, 'mock_injections.h5'), key='true_parameters')
     obs = pd.read_hdf(op.join(paths.data, 'mock_observations.h5'), key='observations')
@@ -17,7 +17,9 @@ if __name__ == '__main__':
 
     n = rng.poisson(nex)
     wt = weighting.default_pop_wt(obs['m1'], obs['q'], obs['z']) / obs['pdraw_mqz']
-    inds = rng.choice(len(obs), size=n, p=wt / np.sum(wt), replace=False)
+    ne = np.square(np.sum(wt))/np.sum(np.square(wt))
+    print(f'{ne=:.1f}, drawing {n} samples')
+    inds = rng.choice(len(wt), size=n, p=wt/np.sum(wt), replace=False)
 
     nsamp = 128
     df = pd.DataFrame()

@@ -25,8 +25,8 @@ def line_between(z0, y0, z1, y1):
 # mz_high = line_between(0, 1000.0, 2.5, 50)
 # qz_low = line_between(0.6, 0.0, 2.6, 1)
 
-z_horiz = 3.6
-chirp_dist_min = 1.6
+z_horiz = 3.5
+chirp_dist_min = 1.5
 
 def compute_snrs(ir):
     i, r = ir
@@ -117,8 +117,22 @@ class InterpolatedPDF(object):
     
     def icdf(self, c):
         return np.interp(c, self.cdfs, self.xs)
-        
 
+class PowerLawPDF(object):
+    def __init__(self, alpha, a, b):
+        assert alpha > 1
+
+        self.alpha = alpha
+        self.a = a
+        self.b = b
+
+        self.norm = (self.a - (self.a/self.b)**self.alpha*self.b)/(self.a*(self.alpha-1))
+
+    def __call__(self, x):
+        return (self.a/x)**self.alpha/self.a/self.norm
+    
+    def icdf(self, c):
+        return ((self.a**self.alpha*self.b*c + self.a*self.b**self.alpha*(1-c))/(self.a*self.b)**self.alpha)**(1/(1-self.alpha))
 
 ndraw = 10000000
 
@@ -128,27 +142,20 @@ if __name__ == '__main__':
     with Pool() as pool:
         df = pd.DataFrame(columns = ['m1', 'q', 'z', 'iota', 'ra', 'dec', 'psi', 'gmst', 's1x', 's1y', 's1z', 's2x', 's2y', 's2z', 'pdraw_mqz', 'SNR_H1', 'SNR_L1', 'SNR_V1', 'SNR'])
 
-        # We want to draw from p(m1) ~ m1^(-2), p(mtotal | m1) ~ mtotal^-2, p(z) ~ (1+z)^2.7/(1 + ((1+z)/(1+zp))^(5.6))
-        zpdf = InterpolatedPDF(np.array([0.0, 0.38128367, 0.49570627, 0.58798213, 0.67359856,
-                                         0.75981976, 0.85396694, 0.96128184, 1.0959582 , 1.30049102,
-                                         z_horiz]),
-                               np.array([0. , 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1. ]))
-        mpdf = InterpolatedPDF(np.array([  5.0,  77.76163523, 106.05160614, 133.58633639,  
-                                         162.49210338, 194.67277074, 231.51827661, 273.80747305,
-                                         326.16370407, 395.48583316, 500.0]),
-                               np.array([0. , 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1. ]))
-        qscaledpdf = InterpolatedPDF(np.array([1.89065178e-04, 2.17933001e-01, 3.26107302e-01, 4.20002256e-01,
-                                               5.04506939e-01, 5.90430153e-01, 6.72685048e-01, 7.52949753e-01,
-                                               8.37576519e-01, 9.18350223e-01, 9.99968397e-01]),
-                                     np.array([0. , 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1. ]))
-
-        m = mpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
-        qscaled = qscaledpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
+        # We want to draw from p(m1) ~ m1^(-2.35), p(mtotal | m1) ~ mtotal^-2, p(z) ~ (1+z)^2.7/(1 + ((1+z)/(1+zp))^(5.6))
+        zpdf = ZPDF()
         z = zpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
 
-        q = qscaled*(1-5/m) + 5/m
+        mpdf = PowerLawPDF(2.35, 5, 500)
+        m = mpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
 
-        pdraw = mpdf(m)*qscaledpdf(qscaled)*zpdf(z)/(1-5/m)
+        mtpdf = PowerLawPDF(2, m+5, 2*m)
+        mt = mtpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
+
+        m2 = mt - m
+        q = m2/m
+
+        pdraw = mpdf(m)*(mtpdf(mt)*m)*zpdf(z)
 
         iota = np.arccos(rng.uniform(low=-1, high=1, size=ndraw))
 

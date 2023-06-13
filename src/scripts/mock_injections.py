@@ -7,8 +7,9 @@ import os.path as op
 import sys
 import pandas as pd
 import paths
-from tqdm import tqdm
+from tqdm import tqdm, trange
 import weighting
+import scipy.integrate as sint
 import intensity_models
 
 def next_pow_2(x):
@@ -82,8 +83,65 @@ def compute_snrs(d):
 
     return d
 
-ndraw = 100000000
-nbatch = 10000
+class ZPDF(object):
+    def __init__(self, lam, kappa, zp, zmax, cosmo):
+        self.lam = lam
+        self.kappa = kappa
+        self.zp = zp
+
+        self.zmax = zmax
+        self.cosmo = cosmo
+
+        self.zinterp = np.expm1(np.linspace(np.log(1), np.log(1+self.zmax), 1024))
+        self.norm = 1
+
+        unnorm_pdf = self(self.zinterp)
+        
+        self.norm = 1/np.trapz(unnorm_pdf, self.zinterp)
+        self.pdfinterp = unnorm_pdf * self.norm
+
+        self.cdfinterp = sint.cumtrapz(self.pdfinterp, self.zinterp, initial=0)
+
+    def __call__(self, z):
+        if self.cosmo == 'default':
+            return self.norm*(1+z)**self.lam / (1 + ((1+z)/(1+self.zp))**self.kappa) * Planck18.differential_comoving_volume(z).to(u.Gpc**3/u.sr).value / (1+z)
+        else:
+            return self.norm*(1+z)**self.lam / (1 + ((1+z)/(1+self.zp))**self.kappa) * self.cosmo.dVCdz(z) / (1+z)
+
+    def icdf(self, c):
+        return np.interp(c, self.cdfinterp, self.zinterp)
+    
+class InterpolatedPDF(object):
+    def __init__(self, xs, cdfs):
+        self.xs = xs
+        self.cdfs = cdfs / cdfs[-1]
+        self.pdfs = np.diff(cdfs) / np.diff(xs)
+
+    def __call__(self, x):
+        x = np.atleast_1d(x)
+        i = np.searchsorted(self.xs, x)-1
+
+        return self.pdfs[i]
+    
+    def icdf(self, c):
+        return np.interp(c, self.cdfs, self.xs)
+
+class PowerLawPDF(object):
+    def __init__(self, alpha, a, b):
+        assert alpha > 1
+
+        self.alpha = alpha
+        self.a = a
+        self.b = b
+
+        self.norm = (self.a - (self.a/self.b)**self.alpha*self.b)/(self.a*(self.alpha-1))
+
+    def __call__(self, x):
+        return (self.a/x)**self.alpha/self.a/self.norm
+    
+    def icdf(self, c):
+        return ((self.a**self.alpha*self.b*c + self.a*self.b**self.alpha*(1-c))/(self.a*self.b)**self.alpha)**(1/(1-self.alpha))
+
 
 def calc_nex(df_det, default_settings, **kwargs):
     for key in df_det.keys():
@@ -134,78 +192,74 @@ if __name__ == '__main__':
     if not default:
         custom_cosmo = intensity_models.FlatwCDMCosmology(population_parameters['h'], population_parameters['Om'], population_parameters['w'])
         population_parameters['cosmo'] = custom_cosmo
+    if default:
+        zpdf = ZPDF(lam=2.7, kappa=5.6, zp=1.9, zmax = 20, cosmo='default')
+    else:
+        zpfg = ZPDF(lam=population_parameters["lam"], kappa=population_parameters["kappa"], zp=population_parameters["zp"], zmax = population_parameters.get("zmax", 20), cosmo=population_parameters["cosmo"])
+    mpdf = PowerLawPDF(2.35, 5, 500)
+
     rng = np.random.default_rng(333165393797366967556667466879860422123)
+    ndraw = 1000000
+    dictlist=  []
 
-    wt_sum = 0
+    #df = pd.DataFrame(columns = ['m1', 'q', 'z', 'iota', 'ra', 'dec', 'psi', 'gmst', 's1x', 's1y', 's1z', 's2x', 's2y', 's2z', 'pdraw_mqz', 'SNR_H1', 'SNR_L1', 'SNR_V1', 'SNR'])
+    z = zpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
+    m = mpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
+    mtpdf = PowerLawPDF(2, m+5, 2*m)
 
-    with tqdm(total=ndraw) as bar:
-        df = pd.DataFrame()
-        #df = pd.DataFrame(columns = ['m1', 'q', 'z', 'iota', 'ra', 'dec', 'psi', 'gmst', 's1x', 's1y', 's1z', 's2x', 's2y', 's2z', 'pdraw_mqz', 'SNR_H1', 'SNR_L1', 'SNR_V1', 'SNR'])
-        for _ in range(ndraw // nbatch):
+    mt = mtpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
 
-            m = rng.uniform(low=5, high=150, size=nbatch)
-            q = rng.uniform(low=0, high=1, size=nbatch)
-            z = rng.uniform(low=0, high=20, size=nbatch)
+    m2 = mt - m
+    q = m2/m
 
-            m1d = m * (1 + z)
-            iota = np.arccos(rng.uniform(low=-1, high=1, size=nbatch))
+    pdraw = mpdf(m)*(mtpdf(mt)*m)*zpdf(z)
 
-            ra = rng.uniform(low=0, high=2*np.pi, size=nbatch)
-            dec = np.arcsin(rng.uniform(low=-1, high=1, size=nbatch))
+    m1d = m * (1 + z)
+    iota = np.arccos(rng.uniform(low=-1, high=1, size=ndraw))
 
-            # 0 < psi < pi, uniformly distributed
-            psi = rng.uniform(low=0, high=np.pi, size=nbatch)
-            gmst = rng.uniform(low=0, high=2*np.pi, size=nbatch)
+    ra = rng.uniform(low=0, high=2*np.pi, ndraw)
+    dec = np.arcsin(rng.uniform(low=-1, high=1, size=ndraw))
 
-            s1x, s1y, s1z = rng.normal(loc=0, scale=0.2/np.sqrt(3), size=(3, nbatch))
-            s2x, s2y, s2z = rng.normal(loc=0, scale=0.2/np.sqrt(3), size=(3, nbatch))
+    # 0 < psi < pi, uniformly distributed
+    psi = rng.uniform(low=0, high=np.pi, size=ndraw)
+    gmst = rng.uniform(low=0, high=2*np.pi, size=ndraw)
 
-            pdraw = 1/(150-5)*1*1/20
-            if default:
-                dL = Planck18.luminosity_distance(z).to(u.Gpc).value
-                dm1sz_dm1ddl = weighting.dm1sz_dm1ddl(z, cosmo=None)
-            else:
-                dm1sz_dm1ddl = weighting.dm1sz_dm1ddl(z, cosmo=population_parameters['cosmo'])
-                dL = population_parameters['cosmo'].dL(z)
+    s1x, s1y, s1z = rng.normal(loc=0, scale=0.2/np.sqrt(3), size=(3,ndraw))
+    s2x, s2y, s2z = rng.normal(loc=0, scale=0.2/np.sqrt(3), size=(3,ndraw))
 
-            wt = np.array(weighting.pop_wt(m, q, z, default=default, **population_parameters))
+    if default:
+        dL = Planck18.luminosity_distance(z).to(u.Gpc).value
+        dm1sz_dm1ddl = weighting.dm1sz_dm1ddl(z, cosmo=None)
+    else:
+        dm1sz_dm1ddl = weighting.dm1sz_dm1ddl(z, cosmo=population_parameters['cosmo'])
+        dL = population_parameters['cosmo'].dL(z)
 
-            wt[m*q < 5] = 0 # Cut out events with m2 < 5
-            wt_sum += np.sum(wt/pdraw)
-
-            r = rng.uniform(low=0, high=np.max(wt), size=nbatch)
-            sel = r < wt
-
-            d = pd.DataFrame({
-                'm1': m[sel],
-                'q': q[sel],
-                'z': z[sel],
-                'dL': dL[sel],
-                'm1d': m1d[sel],
-                'iota': iota[sel],
-                'ra': ra[sel],
-                'dec': dec[sel],
-                'psi': psi[sel],
-                'gmst': gmst[sel],
-                's1x': s1x[sel],
-                's1y': s1y[sel],
-                's1z': s1z[sel],
-                's2x': s2x[sel],
-                's2y': s2y[sel],
-                's2z': s2z[sel],
-                'pdraw_mqz': wt[sel],
-                'dm1sz_dm1ddl': dm1sz_dm1ddl[sel]
-            })
-            if snr_threshold > 0:
-                d = compute_snrs(d)
-            else:
-                d['SNR'] = 10000000
-            df = pd.concat((df, d))
-            bar.update(nbatch)
-
-    wt_sum /= ndraw
-    df['pdraw_mqz'] = df['pdraw_mqz'] / wt_sum
-
+    df = pd.DataFrame({
+        'm1': m,
+        'q': q,
+        'z': z,
+        'dL': dL,
+        'm1d': m1d,
+        'iota': iota,
+        'ra': ra,
+        'dec': dec,
+        'psi': psi,
+        'gmst': gmst,
+        's1x': s1x,
+        's1y': s1y,
+        's1z': s1z,
+        's2x': s2x,
+        's2y': s2y,
+        's2z': s2z,
+        'pdraw_mqz': pdraw,
+        'dm1sz_dm1ddl': dm1sz_dm1ddl
+    })
+    if snr_threshold > 0:
+        df = compute_snrs(df)
+    else:
+        df['SNR'] = 10000000
+    p_pop = weighting.pop_wt(np.array(df['m1']), np.array(df['q']), np.array(df['z']), default=default, **population_parameters) / df['pdraw_mqz']
+    df['p_pop'] = p_pop
     df.to_hdf(outfile, key='true_parameters')
 
     df_det = df[df['SNR'] > snr_threshold]

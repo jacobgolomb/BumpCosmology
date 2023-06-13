@@ -217,7 +217,7 @@ if __name__ == '__main__':
     m1d = m * (1 + z)
     iota = np.arccos(rng.uniform(low=-1, high=1, size=ndraw))
 
-    ra = rng.uniform(low=0, high=2*np.pi, ndraw)
+    ra = rng.uniform(low=0, high=2*np.pi, size=ndraw)
     dec = np.arcsin(rng.uniform(low=-1, high=1, size=ndraw))
 
     # 0 < psi < pi, uniformly distributed

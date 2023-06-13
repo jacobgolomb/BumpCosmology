@@ -7,7 +7,9 @@ import h5py
 import intensity_models
 import jax.numpy as jnp
 import numpy as np
+import intensity_models
 
+COSMO_PARAMS = ['h', 'w', 'Om']
 @dataclass
 class ModelParameters(object):
     a: object = 1.2
@@ -34,6 +36,21 @@ def default_pop_wt(m1, q, z):
     """Weights in `(m1,q,z)` corresponding to the :func:`default_log_dNdmdqdV`."""
     log_dN = default_log_dNdmdqdV(m1, q, z)
     return np.exp(log_dN)*Planck18.differential_comoving_volume(z).to(u.Gpc**3/u.sr).value/(1+z)
+
+def pop_wt(m1, q, z, default=True, **kwargs):
+    if default:
+        h, Om, w = Planck18.h, Planck18.Om0, -1
+        log_dN_func = default_log_dNdmdqdV
+    else:
+        pop_params = {key: kwargs[key] for key in ModelParameters().keys()}
+        h, Om, w = kwargs['h'], kwargs['Om'], kwargs['w']
+        log_dN_func = intensity_models.LogDNDMDQDV(**pop_params)
+    if "cosmo" not in kwargs.keys():
+        cosmo = intensity_models.FlatwCDMCosmology(h, Om, w)
+    else:
+        cosmo = kwargs.get("cosmo")
+    log_dN = log_dN_func(m1, q, z)
+    return np.exp(log_dN) * cosmo.dVCdz(z) / (1+z)
 
 def li_prior_wt(m1, q, z, cosmology_weighted=False):
     """Returns LALInference/Bilby prior over `m1`, `q`, and `z`.
@@ -166,8 +183,15 @@ def extract_selection_samples(file, nsamp, desired_pop_wt=None, far_threshold=1,
 
         return m1s_sel_cut, qs_sel_cut, zs_sel_cut, pdraw_sel_cut, ndraw_cut
     
-def dm1qz_dm1dqdl(m1, q, z):
-    return (1+z)/(Planck18.comoving_distance(z).to(u.Gpc).value + (1+z)*Planck18.hubble_distance.to(u.Gpc).value / Planck18.efunc(z))
+def dm1sz_dm1ddl(z, cosmo=None):
+    if not cosmo:
+        #return (1+z) / (Planck18.comoving_distance(z).to(u.Gpc).value + (1+z)*Planck18.hubble_distance.to(u.Gpc).value / Planck18.efunc(z))
+        dm1s_dm1d = (1+z)**-1
+        ddl_dz = (Planck18.comoving_distance(z).to(u.Gpc).value + (1 + z) * Planck18.hubble_distance.to(u.Gpc).value / Planck18.efunc(z))
+
+        return dm1s_dm1d * (ddl_dz)**-1
+    else:
+        return (1+z)**-1 / (cosmo.dC(z) + (1+z)*cosmo.dH / cosmo.E(z))
 
 def draw_mock_samples(log_mc_obs, sigma_log_mc, q_obs, sigma_q, log_dl_obs, sigma_log_dl, size=1, output_source_frame=False, rng=None):
     if rng is None:

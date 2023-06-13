@@ -4,10 +4,12 @@ import lal
 import lalsimulation as ls
 import numpy as np
 import os.path as op
+import sys
 import pandas as pd
 import paths
 from tqdm import tqdm
 import weighting
+import intensity_models
 
 def next_pow_2(x):
     np2 = 1
@@ -30,8 +32,7 @@ def compute_snrs(d):
 
             a1 = np.sqrt(r.s1x*r.s1x + r.s1y*r.s1y + r.s1z*r.s1z)
             a2 = np.sqrt(r.s2x*r.s2x + r.s2y*r.s2y + r.s2z*r.s2z)
-
-            dl = Planck18.luminosity_distance(r.z).to(u.Gpc).value * 1e9*lal.PC_SI
+            dl = d['dL'] * 1e9*lal.PC_SI
 
             fmin = 9.0
             fref = fmin
@@ -84,19 +85,69 @@ def compute_snrs(d):
 ndraw = 100000000
 nbatch = 10000
 
+def calc_nex(df_det, default_settings, **kwargs):
+    for key in df_det.keys():
+        df_det[key] = np.array(df_det[key])
+    if default_settings:
+        h, Om, w = Planck18.h, Planck18.Om0, -1
+        log_dN_func = weighting.default_log_dNdmdqdV
+        rate = weighting.default_parameters.R
+    else:
+        pop_params = {key: kwargs[key] for key in ModelParameters().keys()}
+        h, Om, w = kwargs['h'], kwargs['Om'], kwargs['w']
+        rate = kwargs['R']
+        log_dN_func = intensity_models.LogDNDMDQDV(**pop_params)
+    if "cosmo" not in kwargs.keys():
+        cosmo = intensity_models.FlatwCDMCosmology(h, Om, w)
+    else:
+        cosmo = kwargs.get("cosmo")
+    log_dN = log_dN_func(df_det['m1'], df_det['q'], df_det['z'])
+    nex = np.sum(rate*np.exp(log_dN)*cosmo.dVCdz(df_det['z'])*4*np.pi/(1+df_det['z'])/df_det['pdraw_mqz'])/len(df)
+    return nex
+
+
+
 if __name__ == '__main__':
+
+    if sys.argv[1] == 'default':
+        default = True
+    else:
+        default = False
+        custom_params = sys.argv[1]
+    if sys.argv[2]:
+        snr_threshold = float(sys.argv[2])
+    else:
+        snr_threshold = 0
+    if sys.argv[3]:
+        outfile = sys.argv[3]
+    else:
+        outfile = op.join(paths.data, 'mock_injections.h5')
+
+    population_parameters = dict()
+    if not default:
+        with open("file.txt") as param_file:
+            for line in param_file:
+                (key, val) = line.split('=')
+                population_parameters[key.strip()] = float(val.strip())
+
+    custom_cosmo = None
+    if not default:
+        custom_cosmo = intensity_models.FlatwCDMCosmology(population_parameters['h'], population_parameters['Om'], population_parameters['w'])
+        population_parameters['cosmo'] = custom_cosmo
     rng = np.random.default_rng(333165393797366967556667466879860422123)
 
     wt_sum = 0
 
     with tqdm(total=ndraw) as bar:
-        df = pd.DataFrame(columns = ['m1', 'q', 'z', 'iota', 'ra', 'dec', 'psi', 'gmst', 's1x', 's1y', 's1z', 's2x', 's2y', 's2z', 'pdraw_mqz', 'SNR_H1', 'SNR_L1', 'SNR_V1', 'SNR'])
+        df = pd.DataFrame()
+        #df = pd.DataFrame(columns = ['m1', 'q', 'z', 'iota', 'ra', 'dec', 'psi', 'gmst', 's1x', 's1y', 's1z', 's2x', 's2y', 's2z', 'pdraw_mqz', 'SNR_H1', 'SNR_L1', 'SNR_V1', 'SNR'])
         for _ in range(ndraw // nbatch):
 
             m = rng.uniform(low=5, high=150, size=nbatch)
             q = rng.uniform(low=0, high=1, size=nbatch)
-            z = rng.uniform(low=0, high=2.75, size=nbatch)
+            z = rng.uniform(low=0, high=20, size=nbatch)
 
+            m1d = m * (1 + z)
             iota = np.arccos(rng.uniform(low=-1, high=1, size=nbatch))
 
             ra = rng.uniform(low=0, high=2*np.pi, size=nbatch)
@@ -109,9 +160,15 @@ if __name__ == '__main__':
             s1x, s1y, s1z = rng.normal(loc=0, scale=0.2/np.sqrt(3), size=(3, nbatch))
             s2x, s2y, s2z = rng.normal(loc=0, scale=0.2/np.sqrt(3), size=(3, nbatch))
 
-            pdraw = 1/(150-5)*1*1/2.75
+            pdraw = 1/(150-5)*1*1/20
+            if default:
+                dL = Planck18.luminosity_distance(z).to(u.Gpc).value
+                dm1sz_dm1ddl = weighting.dm1sz_dm1ddl(z, cosmo=None)
+            else:
+                dm1sz_dm1ddl = weighting.dm1sz_dm1ddl(z, cosmo=population_parameters['cosmo'])
+                dL = population_parameters['cosmo'].dL(z)
 
-            wt = weighting.default_pop_wt(m, q, z)
+            wt = np.array(weighting.pop_wt(m, q, z, default=default, **population_parameters))
 
             wt[m*q < 5] = 0 # Cut out events with m2 < 5
             wt_sum += np.sum(wt/pdraw)
@@ -123,6 +180,8 @@ if __name__ == '__main__':
                 'm1': m[sel],
                 'q': q[sel],
                 'z': z[sel],
+                'dL': dL[sel],
+                'm1d': m1d[sel],
                 'iota': iota[sel],
                 'ra': ra[sel],
                 'dec': dec[sel],
@@ -134,20 +193,23 @@ if __name__ == '__main__':
                 's2x': s2x[sel],
                 's2y': s2y[sel],
                 's2z': s2z[sel],
-                'pdraw_mqz': wt[sel]
+                'pdraw_mqz': wt[sel],
+                'dm1sz_dm1ddl': dm1sz_dm1ddl[sel]
             })
-            d = compute_snrs(d)
-
+            if snr_threshold > 0:
+                d = compute_snrs(d)
+            else:
+                d['SNR'] = 10000000
             df = pd.concat((df, d))
             bar.update(nbatch)
 
     wt_sum /= ndraw
     df['pdraw_mqz'] = df['pdraw_mqz'] / wt_sum
 
-    df.to_hdf(op.join(paths.data, 'mock_injections.h5'), key='true_parameters')
+    df.to_hdf(outfile, key='true_parameters')
 
-    df_det = df[df['SNR'] > 9]
-    nex = np.sum(weighting.default_parameters.R*np.exp(weighting.default_log_dNdmdqdV(df_det['m1'], df_det['q'], df_det['z']))*Planck18.differential_comoving_volume(df_det['z']).to(u.Gpc**3/u.sr).value*4*np.pi/(1+df_det['z'])/df_det['pdraw_mqz'])/len(df)
-
-    print('Found {:d} injections with SNR > 9'.format(np.sum(df['SNR'] > 9)))
+    df_det = df[df['SNR'] > snr_threshold]
+    #nex = np.sum(weighting.default_parameters.R*np.exp(weighting.default_log_dNdmdqdV(df_det['m1'], df_det['q'], df_det['z']))*Planck18.differential_comoving_volume(df_det['z']).to(u.Gpc**3/u.sr).value*4*np.pi/(1+df_det['z'])/df_det['pdraw_mqz'])/len(df)
+    nex = calc_nex(df_det, default_settings = default, **population_parameters)
+    print('Found {:d} injections with SNR > {:d}'.format(np.sum(df['SNR'] > snr_threshold), snr_threshold))
     print('Predicting {:.0f} detections per year'.format(nex))

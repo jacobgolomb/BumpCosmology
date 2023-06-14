@@ -266,8 +266,9 @@ if __name__ == '__main__':
         df = compute_snrs(df)
     else:
         df['SNR'] = 10000000
-    p_pop_weight = weighting.pop_wt(np.array(df['m1']), np.array(df['q']), np.array(df['z']), default=default, **population_parameters) / df['pdraw_mqz']
-    df['p_pop_weight'] = p_pop_weight
+    p_pop_numerator = weighting.pop_wt(np.array(df['m1']), np.array(df['q']), np.array(df['z']), default=default, **population_parameters) 
+    df['p_pop_weight'] = p_pop_numerator / df['pdraw_mqz']
+    df['p_pop_numerator'] = p_pop_numerator
     df_det = df[df['SNR'] > snr_threshold]
 
     df_det.to_hdf(outfile, key='true_parameters')

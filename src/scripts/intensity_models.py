@@ -189,6 +189,7 @@ class LogDNDM_evolve(object):
     mbhmax: object
     sigma: object
     fpl: object
+    mbh_min: object = mbh_min
     mref: object = 30.0
     zref: object = 0
     log_norm: object = 0.0
@@ -379,7 +380,7 @@ class LogDNDMDQDV_evolve(object):
         m2 = q*m1
         mt = m1+m2
 
-        return self.log_dndm(m1) + self.log_dndm(m2) + self.beta*jnp.log(mt/(self.mref*(1 + self.qref))) + jnp.log(m1) + self.log_dndv(z)
+        return self.log_dndm(m1, z) + self.log_dndm(m2, z) + self.beta*jnp.log(mt/(self.mref*(1 + self.qref))) + jnp.log(m1) + self.log_dndv(z)
 @dataclass
 class FlatwCDMCosmology(object):
     """
@@ -545,7 +546,7 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
     mpisn = numpyro.sample('mpisn', dist.TruncatedNormal(35.0, 5.0, low=15))
     dmbhmax = numpyro.sample('dmbhmax', dist.TruncatedNormal(5.0, 2.0, low=0.0))
     mbhmax = numpyro.deterministic('mbhmax', mpisn + dmbhmax)
-    sigma = numpyro.sample('sigma', dist.TruncatedNormal(2, 2, low=1))
+    sigma = numpyro.sample('sigma', dist.TruncatedNormal(2, 2, low=1, high=8))
 
     beta = numpyro.sample('beta', dist.Normal(0, 2))
 

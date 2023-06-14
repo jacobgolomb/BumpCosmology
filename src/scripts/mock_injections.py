@@ -196,15 +196,18 @@ if __name__ == '__main__':
         zpdf = ZPDF(lam=2.7, kappa=5.6, zp=1.9, zmax = 20, cosmo='default')
     else:
         zpfg = ZPDF(lam=population_parameters["lam"], kappa=population_parameters["kappa"], zp=population_parameters["zp"], zmax = population_parameters.get("zmax", 20), cosmo=population_parameters["cosmo"])
-    mpdf = PowerLawPDF(2.35, 5, 500)
+    mpdf = PowerLawPDF(2.35, 5, 400)
 
-    rng = np.random.default_rng(333165393797366967556667466879860422123)
-    ndraw = 1000000
-    dictlist=  []
+    #rng = np.random.default_rng(333165393797366967556667466879860422123)
+    rng = np.random.default_rng()
+
+    ndraw = int(1e7)
 
     #df = pd.DataFrame(columns = ['m1', 'q', 'z', 'iota', 'ra', 'dec', 'psi', 'gmst', 's1x', 's1y', 's1z', 's2x', 's2y', 's2z', 'pdraw_mqz', 'SNR_H1', 'SNR_L1', 'SNR_V1', 'SNR'])
+    print("drawing zs and ms")
     z = zpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
     m = mpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
+    print("drawing mts")
     mtpdf = PowerLawPDF(2, m+5, 2*m)
 
     mt = mtpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
@@ -212,6 +215,7 @@ if __name__ == '__main__':
     m2 = mt - m
     q = m2/m
 
+    print("calculating pdraws")
     pdraw = mpdf(m)*(mtpdf(mt)*m)*zpdf(z)
 
     m1d = m * (1 + z)
@@ -224,8 +228,12 @@ if __name__ == '__main__':
     psi = rng.uniform(low=0, high=np.pi, size=ndraw)
     gmst = rng.uniform(low=0, high=2*np.pi, size=ndraw)
 
+    print("assigning spins")
+
     s1x, s1y, s1z = rng.normal(loc=0, scale=0.2/np.sqrt(3), size=(3,ndraw))
     s2x, s2y, s2z = rng.normal(loc=0, scale=0.2/np.sqrt(3), size=(3,ndraw))
+
+    print("calculating dLs")
 
     if default:
         dL = Planck18.luminosity_distance(z).to(u.Gpc).value
@@ -258,12 +266,13 @@ if __name__ == '__main__':
         df = compute_snrs(df)
     else:
         df['SNR'] = 10000000
-    p_pop = weighting.pop_wt(np.array(df['m1']), np.array(df['q']), np.array(df['z']), default=default, **population_parameters) / df['pdraw_mqz']
-    df['p_pop'] = p_pop
-    df.to_hdf(outfile, key='true_parameters')
-
+    p_pop_weight = weighting.pop_wt(np.array(df['m1']), np.array(df['q']), np.array(df['z']), default=default, **population_parameters) / df['pdraw_mqz']
+    df['p_pop_weight'] = p_pop_weight
     df_det = df[df['SNR'] > snr_threshold]
+
+    df_det.to_hdf(outfile, key='true_parameters')
+
     #nex = np.sum(weighting.default_parameters.R*np.exp(weighting.default_log_dNdmdqdV(df_det['m1'], df_det['q'], df_det['z']))*Planck18.differential_comoving_volume(df_det['z']).to(u.Gpc**3/u.sr).value*4*np.pi/(1+df_det['z'])/df_det['pdraw_mqz'])/len(df)
-    nex = calc_nex(df_det, default_settings = default, **population_parameters)
-    print('Found {:d} injections with SNR > {:d}'.format(np.sum(df['SNR'] > snr_threshold), snr_threshold))
-    print('Predicting {:.0f} detections per year'.format(nex))
+    #nex = calc_nex(df_det, default_settings = default, **population_parameters)
+    #print('Found {:d} injections with SNR > {:d}'.format(np.sum(df['SNR'] > snr_threshold), snr_threshold))
+    #print('Predicting {:.0f} detections per year'.format(nex))

@@ -559,7 +559,7 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
     if not evolution:
         log_dN = LogDNDMDQDV(a, b, c, mpisn, mbhmax, sigma, fpl, beta, lam, kappa, zp)
     else:
-        mpisndot = numpyro.sample('mpisndot', dist.TruncatedNormal(4, 2, low=0) )
+        mpisndot = numpyro.sample('mpisndot', dist.TruncatedNormal(0, 2, low=-3) )
         log_dN = LogDNDMDQDV_evolve(a, b, c, mpisn, mbhmax, mpisndot, sigma, fpl, beta, lam, kappa, zp)
 
     zs = cosmo.z_of_dL(dls)

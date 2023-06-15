@@ -690,3 +690,4 @@ def pop_cosmo_model_noselection(m1s_det, qs, dls, pdraw, **kwargs):
     _ = numpyro.deterministic('dNdVdt_fixed_mq', log_dN.mref*R*jnp.exp(log_dN(log_dN.mref, log_dN.qref, coords['z_grid'])))
     _ = numpyro.deterministic('hz', cosmo.h*cosmo.E(coords['z_grid']))
     """
+    

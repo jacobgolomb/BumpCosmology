@@ -205,7 +205,7 @@ class LogDNDM_evolve(object):
     def setup_interp(self):
         self.z_array = jnp.expm1(np.linspace(np.log(1), np.log(1+10), 20))
         mpisns = self.mpisn + self.mpisndot * (1 - 1/(1+self.z_array))
-        self.log_dndm_pisn = LogDNDMPISN_evolve(self.a, self.b, np.array(mpisns), self.mbhmax, self.sigma)
+        self.log_dndm_pisn = LogDNDMPISN_evolve(self.a, self.b, jnp.array(mpisns), self.mbhmax, self.sigma)
         self.mbh_grid = self.log_dndm_pisn.mbh_grid
         self.log_dndm_pisn_grid = self.log_dndm_pisn.log_dN_grid
     

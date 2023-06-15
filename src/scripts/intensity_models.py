@@ -236,8 +236,8 @@ class LogDNDM_evolve(object):
         z = jnp.array(z) 
         log_dNdm = self.interp_2d(m, z)
 
-        log_dNdm = jnp.where(m <= np.min(self.mbh_grid[0]), np.NINF, log_dNdm)
-        log_dNdm = jnp.where(m >= np.max(self.mbh_grid[-1]), np.NINF, log_dNdm)
+        log_dNdm = jnp.where(m <= jnp.min(self.mbh_grid), np.NINF, log_dNdm)
+        log_dNdm = jnp.where(m >= jnp.max(self.mbh_grid), np.NINF, log_dNdm)
 
         log_dNdm = jnp.logaddexp(log_dNdm, -self.c*jnp.log(m/self.mbhmax) + self.log_pl_norm + log_smooth_turnon(m, self.mbhmax))
         log_dNdm = jnp.where(m < self.mbh_min, np.NINF, log_dNdm)

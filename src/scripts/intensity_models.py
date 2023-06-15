@@ -191,7 +191,7 @@ class LogDNDM_evolve(object):
     fpl: object
     mbh_min: object = mbh_min
     mref: object = 30.0
-    zref: object = 0
+    zref: object = 0.01
     log_norm: object = 0.0
     log_pl_norm: object = dataclasses.field(init=False)
     log_dndm_pisn: object = dataclasses.field(init=False)
@@ -280,7 +280,6 @@ class LogDNDM(object):
         log_dNdm = jnp.where(m >= self.log_dndm_pisn.mbh_grid[-1], np.NINF, log_dNdm)
 
         log_dNdm = jnp.logaddexp(log_dNdm, -self.c*jnp.log(m/self.mbhmax) + self.log_pl_norm + log_smooth_turnon(m, self.mbhmax))
-
         log_dNdm = jnp.where(m < self.mbh_min, np.NINF, log_dNdm)
 
         return log_dNdm + self.log_norm
@@ -296,7 +295,7 @@ class LogDNDV(object):
     lam: object
     kappa: object
     zp: object
-    zref: object = 0.0
+    zref: object = 0.01
     log_norm: object = 0.0
 
     def __post_init__(self):
@@ -325,7 +324,7 @@ class LogDNDMDQDV(object):
     zp: object
     mref: object = 30.0
     qref: object = 1.0
-    zref: object = 0.0
+    zref: object = 0.01
     log_dndm: object = dataclasses.field(init=False)
     log_dndv: object = dataclasses.field(init=False)
 
@@ -363,13 +362,13 @@ class LogDNDMDQDV_evolve(object):
     zp: object
     mref: object = 30.0
     qref: object = 1.0
-    zref: object = 0.0
+    zref: object = 0.01
     log_dndm: object = dataclasses.field(init=False)
     log_dndv: object = dataclasses.field(init=False)
 
 
     def __post_init__(self):
-        self.log_dndm = LogDNDM_evolve(self.a, self.b, self.c, self.mpisn, self.mpisndot, self.mbhmax, self.sigma, self.fpl, self.mref)
+        self.log_dndm = LogDNDM_evolve(self.a, self.b, self.c, self.mpisn, self.mpisndot, self.mbhmax, self.sigma, self.fpl, mref=self.mref)
         self.log_dndv = LogDNDV(self.lam, self.kappa, self.zp, self.zref)
 
     def __call__(self, m1, q, z):

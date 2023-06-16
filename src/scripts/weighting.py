@@ -44,7 +44,11 @@ def pop_wt(m1, q, z, default=True, **kwargs):
     else:
         pop_params = {key: kwargs[key] for key in ModelParameters().keys()}
         h, Om, w = kwargs['h'], kwargs['Om'], kwargs['w']
-        log_dN_func = intensity_models.LogDNDMDQDV(**pop_params)
+        if 'mpisndot' in kwargs.keys():
+            pop_params['mpisndot'] = kwargs['mpisndot']
+            log_dN_func = intensity_models.LogDNDMDQDV_evolve(**pop_params)
+        else:
+            log_dN_func = intensity_models.LogDNDMDQDV(**pop_params)
     if "cosmo" not in kwargs.keys():
         cosmo = intensity_models.FlatwCDMCosmology(h, Om, w)
     else:

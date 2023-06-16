@@ -171,7 +171,7 @@ if __name__ == '__main__':
         default = True
     else:
         default = False
-        custom_params = sys.argv[1]
+        custom_params_file = sys.argv[1]
     if sys.argv[2]:
         snr_threshold = float(sys.argv[2])
     else:
@@ -183,7 +183,7 @@ if __name__ == '__main__':
 
     population_parameters = dict()
     if not default:
-        with open("file.txt") as param_file:
+        with open(custom_params_file) as param_file:
             for line in param_file:
                 (key, val) = line.split('=')
                 population_parameters[key.strip()] = float(val.strip())

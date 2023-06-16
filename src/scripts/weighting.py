@@ -42,7 +42,7 @@ def pop_wt(m1, q, z, default=True, **kwargs):
         h, Om, w = Planck18.h, Planck18.Om0, -1
         log_dN_func = default_log_dNdmdqdV
     else:
-        pop_params = {key: kwargs[key] for key in ModelParameters().keys()}
+        pop_params = {key: kwargs[key] for key in vars(ModelParameters()).keys()}
         h, Om, w = kwargs['h'], kwargs['Om'], kwargs['w']
         if 'mpisndot' in kwargs.keys():
             pop_params['mpisndot'] = kwargs['mpisndot']

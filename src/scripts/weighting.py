@@ -8,6 +8,7 @@ import intensity_models
 import jax.numpy as jnp
 import numpy as np
 import intensity_models
+from inspect import getfullargspec
 
 COSMO_PARAMS = ['h', 'w', 'Om']
 @dataclass
@@ -38,17 +39,17 @@ def default_pop_wt(m1, q, z):
     return 4*np.pi*np.exp(log_dN)*Planck18.differential_comoving_volume(z).to(u.Gpc**3/u.sr).value/(1+z)
 
 def pop_wt(m1, q, z, default=True, **kwargs):
-    if default:
+    if default and (not kwargs):
         h, Om, w = Planck18.h, Planck18.Om0, -1
         log_dN_func = default_log_dNdmdqdV
     else:
-        pop_params = {key: kwargs[key] for key in vars(ModelParameters()).keys()}
-        h, Om, w = kwargs['h'], kwargs['Om'], kwargs['w']
+        h, Om, w = kwargs.pop('h'), kwargs.pop('Om'), kwargs.pop('w')
         if 'mpisndot' in kwargs.keys():
-            pop_params['mpisndot'] = kwargs['mpisndot']
-            log_dN_func = intensity_models.LogDNDMDQDV_evolve(**pop_params)
+            log_dN_obj = intensity_models.LogDNDMDQDV_evolve
         else:
-            log_dN_func = intensity_models.LogDNDMDQDV(**pop_params)
+            log_dN_obj = intensity_models.LogDNDMDQDV
+        pop_params = {key: kwargs[key] for key in getfullargspec(log_dN_obj)[1:]}
+        log_dN_func = log_dN_obj(**pop_params)
     if "cosmo" not in kwargs.keys():
         cosmo = intensity_models.FlatwCDMCosmology(h, Om, w)
     else:

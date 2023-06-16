@@ -195,7 +195,7 @@ if __name__ == '__main__':
     if default:
         zpdf = ZPDF(lam=2.7, kappa=5.6, zp=1.9, zmax = 20, cosmo='default')
     else:
-        zdf = ZPDF(lam=population_parameters["lam"], kappa=population_parameters["kappa"], zp=population_parameters["zp"], zmax = population_parameters.get("zmax", 20), cosmo=population_parameters["cosmo"])
+        zpdf = ZPDF(lam=population_parameters["lam"], kappa=population_parameters["kappa"], zp=population_parameters["zp"], zmax = population_parameters.get("zmax", 20), cosmo=population_parameters["cosmo"])
     mpdf = PowerLawPDF(2.35, 5, 400)
 
     #rng = np.random.default_rng(333165393797366967556667466879860422123)

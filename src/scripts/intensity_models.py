@@ -21,7 +21,6 @@ def mean_mbh_from_mco(mco, mpisn, mbhmax):
     """
     a = 1 / (4*(mpisn - mbhmax))
     mcomax = 2*mbhmax - mpisn
-
     return jnp.where(mco < mpisn, mco, mbhmax + a*jnp.square(mco - mcomax))
 
 def largest_mco(mpisn, mbhmax):
@@ -149,11 +148,6 @@ class LogDNDMPISN_evolve(object):
     n_m: object = 256
     mbh_grid: object = dataclasses.field(init=False)
     log_dN_grid: object = dataclasses.field(init=False)
-    
-    
-    
-    #def __post_init__(self):
-        
 
     def __post_init__(self):
         min_bh_mass = 3.0
@@ -169,8 +163,8 @@ class LogDNDMPISN_evolve(object):
         self.log_dN_grid = jss.logsumexp(log_trapz, axis=1)
         self.mbh_grid = mbh
 
-    def __call__(self, m):
-        return jnp.interp(m, self.mbh_grid, self.log_dN_grid)
+    #def __call__(self, m):
+        #return jnp.interp(m, self.mbh_grid, self.log_dN_grid)
 
 
 @dataclass
@@ -201,10 +195,10 @@ class LogDNDM_evolve(object):
         self.setup_interp()
         self.log_pl_norm = jnp.log(self.fpl) + self.interp_2d(self.mbhmax, self.zref)
 
-        self.log_norm = -(self(jnp.array(self.mref), self.zref) + jnp.log(self.mref)) # normalize so that m dNdm = 1 at mref
+        self.log_norm = -(self(self.mref, self.zref) + jnp.log(self.mref)) # normalize so that m dNdm = 1 at mref
 
     def setup_interp(self):
-        self.z_array = jnp.expm1(np.linspace(np.log(1), np.log(1+self.zmax), 20))
+        self.z_array = jnp.expm1(jnp.linspace(np.log(1), np.log(1+self.zmax), 20))
         mpisns = self.mpisn + self.mpisndot * (1 - 1/(1+self.z_array))
         self.log_dndm_pisn = LogDNDMPISN_evolve(self.a, self.b, jnp.array(mpisns), self.mbhmax, self.sigma)
         self.mbh_grid = self.log_dndm_pisn.mbh_grid
@@ -224,13 +218,17 @@ class LogDNDM_evolve(object):
         f2 = self.log_dndm_pisn_grid[m_indxs, z_indxs - 1]
         f3 = self.log_dndm_pisn_grid[m_indxs, z_indxs]
         f4 = self.log_dndm_pisn_grid[m_indxs - 1, z_indxs]
-        
-        t = (m - m_lower) / (m_upper - m_lower)
-        u = (z - z_lower) / (z_upper - z_lower)
+
+        mdiffs = m_upper - m_lower
+        zdiffs = z_upper - z_lower
+
+        mdiffs = jnp.where(mdiffs != 0, mdiffs, np.inf)
+        zdiffs = jnp.where(zdiffs != 0, zdiffs, np.inf)
+
+        t = jnp.where(m_lower == m_upper, 0, (m - m_lower) / mdiffs)
+        u = jnp.where(z_lower == z_upper, 0, (z - z_lower) / zdiffs)
         
         return (1 - t) * (1 - u) * f1 + t * (1 - u) * f2 + t * u *f3 + (1 - t) * u * f4
-        
-        
         
     def __call__(self, m, z):
         m = jnp.array(m)
@@ -577,7 +575,7 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
 
     log_sel_wts = log_dN(m1s_sel, qs_sel, zs_sel) - 2*jnp.log1p(zs_sel) + jnp.log(cosmo.dVCdz(zs_sel)) - jnp.log(cosmo.ddL_dz(zs_sel)) - log_pdraw_sel
     log_mu_sel = jss.logsumexp(log_sel_wts) - jnp.log(Ndraw)
-    _ = numpyro.factor('selfactor', -nobs*log_mu_sel)
+    _ = numpyro.factor('selfactor', jnp.nan_to_num(jnp.nan_to_num(-nobs*log_mu_sel, nan=-np.inf)))
 
     log_mu2 = jss.logsumexp(2*log_sel_wts) - 2*jnp.log(Ndraw)
     log_s2 = log_mu2 + jnp.log1p(-jnp.exp(2*log_mu_sel - jnp.log(Ndraw) - log_mu2))
@@ -594,6 +592,9 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
     _ = numpyro.deterministic('dNdqdVdt_fixed_mz', log_dN.mref*R*jnp.exp(log_dN(log_dN.mref, coords['q_grid'], log_dN.zref)))
     _ = numpyro.deterministic('dNdVdt_fixed_mq', log_dN.mref*R*jnp.exp(log_dN(log_dN.mref, log_dN.qref, coords['z_grid'])))
     _ = numpyro.deterministic('hz', cosmo.h*cosmo.E(coords['z_grid']))
+
+
+
 
 def pop_cosmo_model_noselection(m1s_det, qs, dls, pdraw, **kwargs):
     m1s_det, qs, dls, pdraw = map(jnp.array, (m1s_det, qs, dls, pdraw))

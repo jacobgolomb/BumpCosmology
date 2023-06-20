@@ -193,18 +193,20 @@ class LogDNDM_evolve(object):
 
     def __post_init__(self):
         self.setup_interp()
-        self.log_pl_norm = jnp.log(self.fpl) + self.interp_2d(self.mbhmax, self.zref)
+        self.log_pl_norm = jnp.log(self.fpl) + self.interp_2d_dndmpisn(self.mbhmax, self.zref)
 
         self.log_norm = -(self(self.mref, self.zref) + jnp.log(self.mref)) # normalize so that m dNdm = 1 at mref
 
     def setup_interp(self):
         self.z_array = jnp.expm1(jnp.linspace(np.log(1), np.log(1+self.zmax), 20))
+        dmbhmax = self.mbhmax - self.mpisn
         mpisns = self.mpisn + self.mpisndot * (1 - 1/(1+self.z_array))
-        self.log_dndm_pisn = LogDNDMPISN_evolve(self.a, self.b, jnp.array(mpisns), self.mbhmax, self.sigma)
+        mbhmaxs = mpisns + dmbhmax
+        self.log_dndm_pisn = LogDNDMPISN_evolve(self.a, self.b, jnp.array(mpisns), jnp.array(mbhmaxs), self.sigma)
         self.mbh_grid = self.log_dndm_pisn.mbh_grid
         self.log_dndm_pisn_grid = self.log_dndm_pisn.log_dN_grid
     
-    def interp_2d(self, m, z):
+    def interp_2d_dndmpisn(self, m, z):
         m_indxs = jnp.searchsorted(self.mbh_grid, m)
         z_indxs = jnp.searchsorted(self.z_array, z)
         
@@ -233,7 +235,7 @@ class LogDNDM_evolve(object):
     def __call__(self, m, z):
         m = jnp.array(m)
         z = jnp.array(z) 
-        log_dNdm = self.interp_2d(m, z)
+        log_dNdm = self.interp_2d_dndmpisn(m, z)
 
         #log_dNdm = jnp.where(m <= self.log_dndm_pisn.mbh_grid[0], log_dNdm[0], log_dNdm)
         log_dNdm = jnp.where(m >= self.log_dndm_pisn.mbh_grid[-1], np.NINF, log_dNdm)

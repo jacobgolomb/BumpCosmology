@@ -13,18 +13,18 @@ from inspect import getfullargspec
 COSMO_PARAMS = ['h', 'w', 'Om']
 @dataclass
 class ModelParameters(object):
-    a: object = 1.2
-    b: object  = -0.35
-    c: object = 2.1
-    mpisn: object = 33.0
-    mbhmax: object = 37.0
-    sigma: object = 3.6
-    fpl: object = 0.19
-    beta: object = -1.7
-    lam: object = 3.8
-    kappa:object = 7.3
-    zp: object = 2.0
-    R: object = 2.9
+    a: object = 1.8
+    b: object  = -0.71
+    c: object = 2.9
+    mpisn: object = 31.0
+    mbhmax: object = 36.0
+    sigma: object = 2.3
+    fpl: object = 0.21
+    beta: object = -2.2
+    lam: object = 4.7
+    kappa:object = 7.0
+    zp: object = 3.0
+    R: object = 2.3
 
 default_parameters = ModelParameters()
 

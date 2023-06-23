@@ -190,8 +190,9 @@ if __name__ == '__main__':
 
     custom_cosmo = None
     if not default:
-        custom_cosmo = intensity_models.FlatwCDMCosmology(population_parameters['h'], population_parameters['Om'], population_parameters['w'])
+        custom_cosmo = intensity_models.FlatwCDMCosmology(population_parameters['h'], population_parameters['Om'], population_parameters['w'], population_parameters['zmax'])
         population_parameters['cosmo'] = custom_cosmo
+        print("Using the following custom population_parameters: " + str(population_parameters))
     if default:
         zpdf = ZPDF(lam=2.7, kappa=5.6, zp=1.9, zmax = 20, cosmo='default')
     else:
@@ -201,7 +202,7 @@ if __name__ == '__main__':
     #rng = np.random.default_rng(333165393797366967556667466879860422123)
     rng = np.random.default_rng()
 
-    ndraw = int(1e7)
+    ndraw = int(1e8)
 
     #df = pd.DataFrame(columns = ['m1', 'q', 'z', 'iota', 'ra', 'dec', 'psi', 'gmst', 's1x', 's1y', 's1z', 's2x', 's2y', 's2z', 'pdraw_mqz', 'SNR_H1', 'SNR_L1', 'SNR_V1', 'SNR'])
     print("drawing zs and ms")

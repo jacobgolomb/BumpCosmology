@@ -48,10 +48,10 @@ def pop_wt(m1, q, z, default=True, **kwargs):
             log_dN_obj = intensity_models.LogDNDMDQDV_evolve
         else:
             log_dN_obj = intensity_models.LogDNDMDQDV
-        pop_params = {key: kwargs[key] for key in getfullargspec(log_dN_obj)[1:]}
+        pop_params = {key: kwargs[key] for key in getfullargspec(log_dN_obj)[0][1:] if key in kwargs.keys()}
         log_dN_func = log_dN_obj(**pop_params)
     if "cosmo" not in kwargs.keys():
-        cosmo = intensity_models.FlatwCDMCosmology(h, Om, w)
+        cosmo = intensity_models.FlatwCDMCosmology(h, Om, w, zmax = kwargs.get("zmax", 20))
     else:
         cosmo = kwargs.get("cosmo")
     log_dN = log_dN_func(m1, q, z)
@@ -183,12 +183,15 @@ def extract_selection_samples(file, nsamp, desired_pop_wt=None, far_threshold=1,
         sum_norm_wt = unnorm_wt / np.sum(unnorm_wt)
         pdraw_wt = pop_wt / (np.sum(unnorm_wt) / ndraw)
 
-        inds = rng.choice(len(m1s_sel), size=nsamp, p=sum_norm_wt)
+        if nsamp is not None:
+            inds = rng.choice(len(m1s_sel), size=nsamp, p=sum_norm_wt)
+        else:
+            inds = np.arange(len(m1s_sel))
         m1s_sel_cut = m1s_sel[inds]
         qs_sel_cut = qs_sel[inds]
         zs_sel_cut = zs_sel[inds]
         pdraw_sel_cut = pdraw_wt[inds]
-        ndraw_cut = nsamp
+        ndraw_cut = ndraw
 
         return m1s_sel_cut, qs_sel_cut, zs_sel_cut, pdraw_sel_cut, ndraw_cut
     

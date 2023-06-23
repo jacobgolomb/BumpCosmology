@@ -364,12 +364,13 @@ class LogDNDMDQDV_evolve(object):
     mref: object = 30.0
     qref: object = 1.0
     zref: object = 0.01
+    zmax: object = 20
     log_dndm: object = dataclasses.field(init=False)
     log_dndv: object = dataclasses.field(init=False)
 
 
     def __post_init__(self):
-        self.log_dndm = LogDNDM_evolve(self.a, self.b, self.c, self.mpisn, self.mpisndot, self.mbhmax, self.sigma, self.fpl, mref=self.mref)
+        self.log_dndm = LogDNDM_evolve(self.a, self.b, self.c, self.mpisn, self.mpisndot, self.mbhmax, self.sigma, self.fpl, mref=self.mref, zmax=self.zmax)
         self.log_dndv = LogDNDV(self.lam, self.kappa, self.zp, self.zref)
 
     def __call__(self, m1, q, z):
@@ -526,7 +527,7 @@ def pop_model(m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel, Ndraw):
     _ = numpyro.deterministic('dNdqdVdt_fixed_mz', log_dN.mref*R*jnp.exp(log_dN(log_dN.mref, coords['q_grid'], log_dN.zref)))
     _ = numpyro.deterministic('dNdVdt_fixed_mq', log_dN.mref*R*jnp.exp(log_dN(log_dN.mref, log_dN.qref, coords['z_grid'])))
 
-def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel, Ndraw, evolution = False):
+def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel, Ndraw, evolution = False, zmax=20):
     m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel = map(jnp.array, (m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel))
 
     nobs = m1s_det.shape[0]
@@ -554,16 +555,16 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
     
     lam,kappa,zp = redshift_parameters()
 
-    cosmo = FlatwCDMCosmology(h, Om, w)
+    cosmo = FlatwCDMCosmology(h, Om, w, zmax=zmax)
 
     if not evolution:
         mbhmax = numpyro.deterministic('mbhmax', mpisn + dmbhmax)
-        log_dN = LogDNDMDQDV(a=a, b=b, c=c, mpisn=mpisn, mbhmax=mbhmax, sigma=sigma, fpl=fpl, beta=beta, lam=lam, kappa=kappa, zp=zp)
+        log_dN = LogDNDMDQDV(a=a, b=b, c=c, mpisn=mpisn, mbhmax=mbhmax, sigma=sigma, fpl=fpl, beta=beta, lam=lam, kappa=kappa, zp=zp, zmax=zmax)
     else:
-        mpisndot = numpyro.sample('mpisndot', dist.TruncatedNormal(0, 2, low=0, high=3))
+        mpisndot = numpyro.sample('mpisndot', dist.Uniform(low=0, high=8))
         mpisnzinf = mpisn + mpisndot
         mbhmax = numpyro.deterministic('mbhmax', mpisnzinf + dmbhmax)
-        log_dN = LogDNDMDQDV_evolve(a=a, b=b, c=c, mpisn=mpisn, mpisndot=mpisndot, mbhmax=mbhmax, sigma=sigma, fpl=fpl, beta=beta, lam=lam, kappa=kappa, zp=zp)
+        log_dN = LogDNDMDQDV_evolve(a=a, b=b, c=c, mpisn=mpisn, mpisndot=mpisndot, mbhmax=mbhmax, sigma=sigma, fpl=fpl, beta=beta, lam=lam, kappa=kappa, zp=zp, zmax=zmax)
     zs = cosmo.z_of_dL(dls)
     m1s = m1s_det / (1 + zs)
 

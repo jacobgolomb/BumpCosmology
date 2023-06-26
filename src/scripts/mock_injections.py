@@ -276,6 +276,8 @@ if __name__ == '__main__':
     sel = random_number < (df['p_pop_weight'] / np.max(df['p_pop_weight']))
     df_det = df[df['SNR'] > snr_threshold][sel]
 
+    print(f"Retained {len(df_det)} samples after rejection sampling.")
+
     df_det.to_hdf(outfile, key='true_parameters')
 
     #nex = np.sum(weighting.default_parameters.R*np.exp(weighting.default_log_dNdmdqdV(df_det['m1'], df_det['q'], df_det['z']))*Planck18.differential_comoving_volume(df_det['z']).to(u.Gpc**3/u.sr).value*4*np.pi/(1+df_det['z'])/df_det['pdraw_mqz'])/len(df)

@@ -527,7 +527,7 @@ def pop_model(m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel, Ndraw):
     _ = numpyro.deterministic('dNdqdVdt_fixed_mz', log_dN.mref*R*jnp.exp(log_dN(log_dN.mref, coords['q_grid'], log_dN.zref)))
     _ = numpyro.deterministic('dNdVdt_fixed_mq', log_dN.mref*R*jnp.exp(log_dN(log_dN.mref, log_dN.qref, coords['z_grid'])))
 
-def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel, Ndraw, evolution = False, zmax=20):
+def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel, Ndraw, evolution = False, zmax=20, fixed_cosmo_params = None):
     m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel = map(jnp.array, (m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel))
 
     nobs = m1s_det.shape[0]
@@ -538,7 +538,12 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
     log_pdraw = jnp.log(pdraw)
     log_pdraw_sel = jnp.log(pdraw_sel)
 
-    h,Om,w = cosmo_parameters()
+    if fixed_cosmo_params is None:
+        h,Om,w = cosmo_parameters()
+    else:
+        h = fixed_cosmo_params['h']
+        Om = fixed_cosmo_params['Om']
+        w = fixed_cosmo_params['w']
 
     a = numpyro.sample('a', dist.Normal(2.35, 2))
     b = numpyro.sample('b', dist.Normal(1.9, 2))

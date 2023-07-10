@@ -297,6 +297,7 @@ class LogDNDV(object):
     kappa: object
     zp: object
     zref: object = 0.01
+    zmax: object = 20
     log_norm: object = 0.0
 
     def __post_init__(self):
@@ -305,7 +306,7 @@ class LogDNDV(object):
     def __call__(self, z):
         z = jnp.array(z)
 
-        return self.lam*jnp.log1p(z) - jnp.log1p(((1+z)/(1+self.zp))**self.kappa) + self.log_norm
+        return np.where(z < self.zmax, (self.lam*jnp.log1p(z) - jnp.log1p(((1+z)/(1+self.zp))**self.kappa) + self.log_norm), -np.inf)
     
 @dataclass
 class LogDNDMDQDV(object):
@@ -371,7 +372,7 @@ class LogDNDMDQDV_evolve(object):
 
     def __post_init__(self):
         self.log_dndm = LogDNDM_evolve(self.a, self.b, self.c, self.mpisn, self.mpisndot, self.mbhmax, self.sigma, self.fpl, mref=self.mref, zmax=self.zmax)
-        self.log_dndv = LogDNDV(self.lam, self.kappa, self.zp, self.zref)
+        self.log_dndv = LogDNDV(self.lam, self.kappa, self.zp, self.zref, self.zmax)
 
     def __call__(self, m1, q, z):
         m1 = jnp.array(m1)

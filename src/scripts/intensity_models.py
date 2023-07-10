@@ -302,6 +302,7 @@ class LogDNDV(object):
 
     def __post_init__(self):
         self.log_norm = -self(self.zref)
+        print(self.log_norm)
 
     def __call__(self, z):
         z = jnp.array(z)

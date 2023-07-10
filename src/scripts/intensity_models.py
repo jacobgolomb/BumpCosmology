@@ -306,7 +306,7 @@ class LogDNDV(object):
     def __call__(self, z):
         z = jnp.array(z)
 
-        return np.where(z < self.zmax, (self.lam*jnp.log1p(z) - jnp.log1p(((1+z)/(1+self.zp))**self.kappa) + self.log_norm), -np.inf)
+        return jnp.where(z < self.zmax, (self.lam*jnp.log1p(z) - jnp.log1p(((1+z)/(1+self.zp))**self.kappa) + self.log_norm), -jnp.inf)
     
 @dataclass
 class LogDNDMDQDV(object):

@@ -302,7 +302,6 @@ class LogDNDV(object):
 
     def __post_init__(self):
         self.log_norm = -self(self.zref)
-        print(self.log_norm)
 
     def __call__(self, z):
         z = jnp.array(z)
@@ -343,6 +342,8 @@ class LogDNDMDQDV(object):
 
         m2 = q*m1
         mt = m1+m2
+
+        print(self.log_dndv(z))
 
         return self.log_dndm(m1) + self.log_dndm(m2) + self.beta*jnp.log(mt/(self.mref*(1 + self.qref))) + jnp.log(m1) + self.log_dndv(z)
 

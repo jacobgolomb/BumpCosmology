@@ -343,8 +343,6 @@ class LogDNDMDQDV(object):
         m2 = q*m1
         mt = m1+m2
 
-        print(self.log_dndv(z))
-
         return self.log_dndm(m1) + self.log_dndm(m2) + self.beta*jnp.log(mt/(self.mref*(1 + self.qref))) + jnp.log(m1) + self.log_dndv(z)
 
 @dataclass
@@ -383,6 +381,7 @@ class LogDNDMDQDV_evolve(object):
 
         m2 = q*m1
         mt = m1+m2
+        print(self.log_dndv(z))
 
         return self.log_dndm(m1, z) + self.log_dndm(m2, z) + self.beta*jnp.log(mt/(self.mref*(1 + self.qref))) + jnp.log(m1) + self.log_dndv(z)
 @dataclass

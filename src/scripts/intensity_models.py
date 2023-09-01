@@ -174,9 +174,9 @@ class LogDNDMPISN_evolve(object):
 
         sigma = sigma_mbh_from_mco(mco[None,:], self.mpisn, self.mbhmax, self.sigma)
         mu = mean_mbh_from_mco(mco[None,:], self.mpisn, self.mbhmax)
+        mu = jnp.where(mu < 0.0, 0.0, mu)
 
         log_wts = log_dNdmCO(mco[None,:], self.a, self.b) - 0.5*jnp.square((jnp.log(mbh[:,None,None]) - jnp.log(mu))/sigma) - np.log(np.sqrt(2*np.pi)) - jnp.log(sigma) - jnp.log(mbh[:,None,None])     
-        log_wts = jnp.nan_to_num(log_wts, nan = -jnp.inf)
         log_trapz = np.log(0.5) + jnp.logaddexp(log_wts[:,1:, :], log_wts[:,:-1, :]) + jnp.log(jnp.diff(mco[None,:], axis=1))
         self.log_dN_grid = jss.logsumexp(log_trapz, axis=1)
         self.mbh_grid = mbh
@@ -205,8 +205,6 @@ class LogDNDM_evolve(object):
     zmax: object = 20
     mref: object = 30.0
     zref: object = 0.01
-    log_norm: object = 0.0
-    log_pl_norm: object = dataclasses.field(init=False)
     log_dndm_pisn: object = dataclasses.field(init=False)
 
     def __post_init__(self):
@@ -604,8 +602,9 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
 
     log_wts = log_dN(m1s, qs, zs) - 2*jnp.log1p(zs) + jnp.log(cosmo.dVCdz(zs)) - jnp.log(cosmo.ddL_dz(zs)) - log_pdraw
     log_like = jss.logsumexp(log_wts, axis=1) - jnp.log(nsamp)
+    log_like = jnp.nan_to_num(jnp.nan_to_num(jnp.sum(log_like), nan=-np.inf))
 
-    _ = numpyro.factor('loglike', jnp.nan_to_num(jnp.nan_to_num(jnp.sum(log_like), nan=-np.inf)))
+    _ = numpyro.factor('loglike', log_like)
 
     zs_sel = cosmo.z_of_dL(dls_sel)
     m1s_sel = m1s_det_sel / (1 + zs_sel)

@@ -578,7 +578,7 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
     b = numpyro.sample('b', dist.Normal(1.9, 2))
     c = numpyro.sample('c', dist.Normal(4, 2))
 
-    mpisn = numpyro.sample('mpisn', dist.TruncatedNormal(35.0, 5.0, low=15))
+    mpisn = numpyro.sample('mpisn', dist.TruncatedNormal(35.0, 5.0, low=25))
     dmbhmax = numpyro.sample('dmbhmax', dist.TruncatedNormal(5.0, 4.0, low=0.0))
     sigma = numpyro.sample('sigma', dist.TruncatedNormal(0.12, 0.3, low=0.04, high=0.15))
 

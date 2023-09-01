@@ -23,6 +23,21 @@ def mean_mbh_from_mco(mco, mpisn, mbhmax):
     mcomax = 2*mbhmax - mpisn
     return jnp.where(mco < mpisn, mco, mbhmax + a*jnp.square(mco - mcomax))
 
+def sigma_mbh_from_mco(mco, mpisn, mbhmax, sigma):
+    #a = (sigma - 1) / ((mbhmax - mcomax) * (mbhmax - mpisn))
+    #b = - (sigma - 1) * (mcomax + mpisn) /( (mbhmax - mcomax) * (mbhmax - mpisn))
+    #c = (mbhmax**2 - mbhmax * (mcomax + mpisn) + mpisn * mcomax * sigma) / ((mbhmax - mcomax) * (mbhmax - mpisn))
+
+    #sigma_m = jnp.where( (mco > mpisn) & (mco < mcomax), a * mco**2 + b * mco + c, 1)
+
+    #a = (sigma - 1) / (mbhmax - 20)
+    #b = (mbhmax - 20 * sigma) / (mbhmax - 20)
+    #sigma_m = jnp.where(mco > 20, a * mco + b, 1)
+    #sigma_m = jnp.where(mco < mbhmax, a *mco + b, 1)
+    #sigma_m = jnp.where(mco > mbhmax, sigma, sigma_m)
+    #return sigma_m
+    return sigma #* jnp.ones(sigma_m.shape)
+
 def largest_mco(mpisn, mbhmax):
     """The largest CO core mass with positive BH masses."""
     mcomax = 2*mbhmax - mpisn
@@ -88,7 +103,7 @@ class LogDNDMPISN(object):
     mpisn: object
     mbhmax: object
     sigma: object
-    n_m: object = 256
+    n_m: object = 500
     mbh_grid: object = dataclasses.field(init=False)
     log_dN_grid: object = dataclasses.field(init=False)
 
@@ -99,8 +114,7 @@ class LogDNDMPISN(object):
         max_co_mass = largest_mco(self.mpisn, self.mbhmax)
 
         mbh = jnp.linspace(min_bh_mass, max_bh_mass, self.n_m)
-        mco = jnp.linspace(min_co_mass, max_co_mass, self.n_m)
-
+        mco = jnp.logspace(min_co_mass, max_co_mass, self.n_m)
         log_wts = log_dNdmCO(mco[None,:], self.a, self.b) - 0.5*jnp.square((mbh[:,None] - mean_mbh_from_mco(mco[None,:], self.mpisn, self.mbhmax))/self.sigma) - np.log(np.sqrt(2*np.pi)) - jnp.log(self.sigma)
         log_trapz = np.log(0.5) + jnp.logaddexp(log_wts[:,1:], log_wts[:,:-1]) + jnp.log(jnp.diff(mco[None,:], axis=1))
         self.log_dN_grid = jss.logsumexp(log_trapz, axis=1)
@@ -145,20 +159,24 @@ class LogDNDMPISN_evolve(object):
     mpisn: object
     mbhmax: object
     sigma: object
-    n_m: object = 256
+    n_m: object = 800
     mbh_grid: object = dataclasses.field(init=False)
     log_dN_grid: object = dataclasses.field(init=False)
 
     def __post_init__(self):
         min_bh_mass = 3.0
         min_co_mass = 1.0
-        max_bh_mass = jnp.max(self.mbhmax + 7*self.sigma)
+        max_bh_mass = jnp.max(self.mbhmax *(1 +7*self.sigma))
         max_co_mass = largest_mco(self.mpisn, self.mbhmax)
 
         mbh = jnp.linspace(min_bh_mass, max_bh_mass, self.n_m)
         mco = jnp.linspace(min_co_mass, max_co_mass, self.n_m)
-                
-        log_wts = log_dNdmCO(mco[None,:], self.a, self.b) - 0.5*jnp.square((mbh[:,None,None] - mean_mbh_from_mco(mco[None,:], self.mpisn, self.mbhmax))/self.sigma) - np.log(np.sqrt(2*np.pi)) - jnp.log(self.sigma)        
+
+        sigma = sigma_mbh_from_mco(mco[None,:], self.mpisn, self.mbhmax, self.sigma)
+        mu = mean_mbh_from_mco(mco[None,:], self.mpisn, self.mbhmax)
+
+        log_wts = log_dNdmCO(mco[None,:], self.a, self.b) - 0.5*jnp.square((jnp.log(mbh[:,None,None]) - jnp.log(mu))/sigma) - np.log(np.sqrt(2*np.pi)) - jnp.log(sigma) - jnp.log(mbh[:,None])     
+        log_wts = jnp.nan_to_num(log_wts, nan = -jnp.inf)
         log_trapz = np.log(0.5) + jnp.logaddexp(log_wts[:,1:, :], log_wts[:,:-1, :]) + jnp.log(jnp.diff(mco[None,:], axis=1))
         self.log_dN_grid = jss.logsumexp(log_trapz, axis=1)
         self.mbh_grid = mbh
@@ -192,19 +210,24 @@ class LogDNDM_evolve(object):
     log_dndm_pisn: object = dataclasses.field(init=False)
 
     def __post_init__(self):
+        self.dmbhmax = self.mbhmax - self.mpisn
         self.setup_interp()
-        self.log_pl_norm = jnp.log(self.fpl) + self.interp_2d_dndmpisn(self.mbhmax, self.zref)
 
-        self.log_norm = -(self(self.mref, self.zref) + jnp.log(self.mref)) # normalize so that m dNdm = 1 at mref
+        #mpisn_at_zref = self.mpisn + self.mpisndot * (1 - 1/(1 + self.zref))
+        #mbhmax_at_zref = mpisn_at_zref + self.dmbhmax
+        
+       # self.log_pl_norm = jnp.log(self.fpl) + self.interp_2d_dndmpisn(mbhmax_at_zref, self.zref)
+
+        #self.log_norm = -(self(self.mref, self.zref) + jnp.log(self.mref)) # normalize so that m dNdm = 1 at mref
 
     def setup_interp(self):
-        self.z_array = jnp.expm1(jnp.linspace(np.log(1), np.log(1+self.zmax), 20))
-        dmbhmax = self.mbhmax - self.mpisn
+        self.z_array = jnp.expm1(jnp.linspace(np.log(1), np.log(1+self.zmax), 50))
         mpisns = self.mpisn + self.mpisndot * (1 - 1/(1+self.z_array))
-        mbhmaxs = mpisns + dmbhmax
+        mbhmaxs = mpisns + self.dmbhmax
         self.log_dndm_pisn = LogDNDMPISN_evolve(self.a, self.b, jnp.array(mpisns), jnp.array(mbhmaxs), self.sigma)
         self.mbh_grid = self.log_dndm_pisn.mbh_grid
         self.log_dndm_pisn_grid = self.log_dndm_pisn.log_dN_grid
+        self.mbhmaxs = jnp.array(mbhmaxs)
     
     def interp_2d_dndmpisn(self, m, z):
         m_indxs = jnp.searchsorted(self.mbh_grid, m)
@@ -239,11 +262,14 @@ class LogDNDM_evolve(object):
 
         #log_dNdm = jnp.where(m <= self.log_dndm_pisn.mbh_grid[0], log_dNdm[0], log_dNdm)
         log_dNdm = jnp.where(m >= self.log_dndm_pisn.mbh_grid[-1], np.NINF, log_dNdm)
+        
+        mbhmax_at_samples = jnp.interp(z, xp = self.z_array, fp = self.mbhmaxs)
 
-        log_dNdm = jnp.logaddexp(log_dNdm, -self.c*jnp.log(m/self.mbhmax) + self.log_pl_norm + log_smooth_turnon(m, self.mbhmax))
+        log_dNdmbhmax_at_samples = self.interp_2d_dndmpisn(mbhmax_at_samples, z)
+        log_dNdm = jnp.logaddexp(log_dNdm, jnp.log(self.fpl) + -self.c*jnp.log(m/mbhmax_at_samples) + log_dNdmbhmax_at_samples + log_smooth_turnon(m, mbhmax_at_samples))
         #log_dNdm = jnp.where(m < self.mbh_min, log_dNdm[0], log_dNdm)
         
-        return log_dNdm + self.log_norm
+        return log_dNdm #+ self.log_norm
 
 @dataclass
 class LogDNDM(object):
@@ -373,6 +399,7 @@ class LogDNDMDQDV_evolve(object):
     def __post_init__(self):
         self.log_dndm = LogDNDM_evolve(self.a, self.b, self.c, self.mpisn, self.mpisndot, self.mbhmax, self.sigma, self.fpl, mref=self.mref, zmax=self.zmax)
         self.log_dndv = LogDNDV(self.lam, self.kappa, self.zp, self.zref, zmax=self.zmax)
+        self.log_norm = 2 * np.log(self.mref) + self.log_dndm(self.mref, self.zref) + self.log_dndm(self.qref * self.mref, self.zref) + self.log_dndv(self.zref)
 
     def __call__(self, m1, q, z):
         m1 = jnp.array(m1)
@@ -382,7 +409,7 @@ class LogDNDMDQDV_evolve(object):
         m2 = q*m1
         mt = m1+m2
 
-        return self.log_dndm(m1, z) + self.log_dndm(m2, z) + self.beta*jnp.log(mt/(self.mref*(1 + self.qref))) + jnp.log(m1) + self.log_dndv(z)
+        return self.log_dndm(m1, z) + self.log_dndm(m2, z) + self.beta*jnp.log(mt/(self.mref*(1 + self.qref))) + jnp.log(m1) + self.log_dndv(z) - self.log_norm
         
 @dataclass
 class FlatwCDMCosmology(object):
@@ -461,7 +488,7 @@ def mass_parameters():
     mpisn = numpyro.sample('mpisn', dist.TruncatedNormal(35.0, 5.0, low=20.0, high=50.0))
     dmbhmax = numpyro.sample('dmbhmax', dist.TruncatedNormal(5.0, 2.0, low=0.5, high=11.0))
     mbhmax = numpyro.deterministic('mbhmax', mpisn + dmbhmax)
-    sigma = numpyro.sample('sigma', dist.TruncatedNormal(2, 2, low=1))
+    sigma = numpyro.sample('sigma', dist.TruncatedNormal(2, 4, low=1))
 
     beta = numpyro.sample('beta', dist.Normal(0, 2))
 
@@ -553,7 +580,7 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
 
     mpisn = numpyro.sample('mpisn', dist.TruncatedNormal(35.0, 5.0, low=15))
     dmbhmax = numpyro.sample('dmbhmax', dist.TruncatedNormal(5.0, 2.0, low=0.0))
-    sigma = numpyro.sample('sigma', dist.TruncatedNormal(2, 2, low=1, high=8))
+    sigma = numpyro.sample('sigma', dist.TruncatedNormal(0.12, 0.3, low=0.04, high=0.15))
 
     beta = numpyro.sample('beta', dist.Normal(0, 2))
 
@@ -565,13 +592,13 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
     cosmo = FlatwCDMCosmology(h, Om, w, zmax=zmax)
 
     if not evolution:
-        mbhmax = numpyro.deterministic('mbhmax', mpisn + dmbhmax)
-        log_dN = LogDNDMDQDV(a=a, b=b, c=c, mpisn=mpisn, mbhmax=mbhmax, sigma=sigma, fpl=fpl, beta=beta, lam=lam, kappa=kappa, zp=zp, zmax=zmax)
+        mpisndot = 0
     else:
         mpisndot = numpyro.sample('mpisndot', dist.Uniform(low=0, high=8))
-        mpisnzinf = mpisn + mpisndot
-        mbhmax = numpyro.deterministic('mbhmax', mpisnzinf + dmbhmax)
-        log_dN = LogDNDMDQDV_evolve(a=a, b=b, c=c, mpisn=mpisn, mpisndot=mpisndot, mbhmax=mbhmax, sigma=sigma, fpl=fpl, beta=beta, lam=lam, kappa=kappa, zp=zp, zmax=zmax)
+        
+    mpisnzinf = mpisn + mpisndot
+    mbhmax = numpyro.deterministic('mbhmax', mpisnzinf + dmbhmax)
+    log_dN = LogDNDMDQDV_evolve(a=a, b=b, c=c, mpisn=mpisn, mpisndot=mpisndot, mbhmax=mbhmax, sigma=sigma, fpl=fpl, beta=beta, lam=lam, kappa=kappa, zp=zp, zmax=zmax)
     zs = cosmo.z_of_dL(dls)
     m1s = m1s_det / (1 + zs)
 

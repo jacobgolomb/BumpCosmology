@@ -599,7 +599,6 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
     mpisnzinf = mpisn + mpisndot
     mbhmax = numpyro.deterministic('mbhmax', mpisn + dmbhmax)
     log_dN = LogDNDMDQDV_evolve(a=a, b=b, c=c, mpisn=mpisn, mpisndot=mpisndot, mbhmax=mbhmax, sigma=sigma, fpl=fpl, beta=beta, lam=lam, kappa=kappa, zp=zp, zmax=zmax)
-    print(float(mpisn))
     zs = cosmo.z_of_dL(dls)
     m1s = m1s_det / (1 + zs)
 

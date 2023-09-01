@@ -172,11 +172,11 @@ class LogDNDMPISN_evolve(object):
         mbh = jnp.linspace(min_bh_mass, max_bh_mass, self.n_m+2)
         mco = jnp.linspace(min_co_mass, max_co_mass, self.n_m)
 
-        sigma = sigma_mbh_from_mco(mco[None,:], self.mpisn, self.mbhmax, self.sigma)
+        sigma = self.sigma#sigma_mbh_from_mco(mco[None,:], self.mpisn, self.mbhmax, self.sigma)
         mu = mean_mbh_from_mco(mco[None,:], self.mpisn, self.mbhmax)
         mu = jnp.where(mu < 0.0, 0.0, mu)
 
-        log_wts = log_dNdmCO(mco[None,:], self.a, self.b) - 0.5*jnp.square((jnp.log(mbh[:,None,None]) - jnp.log(mu))/sigma) - np.log(np.sqrt(2*np.pi)) - jnp.log(sigma) - jnp.log(mbh[:,None,None])     
+        log_wts = log_dNdmCO(mco[None,:], self.a, self.b) - 0.5*jnp.square((jnp.log(mbh[:,None,None]) - jnp.log(mu))/sigma) - np.log(np.sqrt(2*np.pi)) - jnp.log(sigma) - jnp.log(mbh[:,None,None]) 
         log_trapz = np.log(0.5) + jnp.logaddexp(log_wts[:,1:, :], log_wts[:,:-1, :]) + jnp.log(jnp.diff(mco[None,:], axis=1))
         self.log_dN_grid = jss.logsumexp(log_trapz, axis=1)
         self.mbh_grid = mbh
@@ -578,7 +578,7 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
 
     mpisn = numpyro.sample('mpisn', dist.TruncatedNormal(35.0, 5.0, low=25))
     dmbhmax = numpyro.sample('dmbhmax', dist.TruncatedNormal(5.0, 4.0, low=0.0))
-    sigma = numpyro.sample('sigma', dist.TruncatedNormal(0.12, 0.3, low=0.04, high=0.15))
+    sigma = numpyro.sample('sigma', dist.Uniform(low=0.04, high=0.2))
 
     beta = numpyro.sample('beta', dist.Normal(0, 2))
 

@@ -511,7 +511,7 @@ def cosmo_parameters():
     w = numpyro.sample('w', dist.TruncatedNormal(-1, 0.25, low=-1.5, high=-0.5))
 
     return h,Om,w
-
+"""
 def pop_model(m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel, Ndraw):
     m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel = map(jnp.array, (m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel))
 
@@ -555,7 +555,7 @@ def pop_model(m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel, Ndraw):
     _ = numpyro.deterministic('mdNdmdVdt_fixed_qz', coords['m_grid']*R*jnp.exp(log_dN(coords['m_grid'], log_dN.qref, log_dN.zref)))
     _ = numpyro.deterministic('dNdqdVdt_fixed_mz', log_dN.mref*R*jnp.exp(log_dN(log_dN.mref, coords['q_grid'], log_dN.zref)))
     _ = numpyro.deterministic('dNdVdt_fixed_mq', log_dN.mref*R*jnp.exp(log_dN(log_dN.mref, log_dN.qref, coords['z_grid'])))
-
+"""
 def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel, Ndraw, evolution = False, zmax=20, fixed_cosmo_params = None):
     m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel = map(jnp.array, (m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel))
 
@@ -579,7 +579,7 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
     c = numpyro.sample('c', dist.Normal(4, 2))
 
     mpisn = numpyro.sample('mpisn', dist.TruncatedNormal(35.0, 5.0, low=15))
-    dmbhmax = numpyro.sample('dmbhmax', dist.TruncatedNormal(5.0, 2.0, low=0.0))
+    dmbhmax = numpyro.sample('dmbhmax', dist.TruncatedNormal(5.0, 4.0, low=0.0))
     sigma = numpyro.sample('sigma', dist.TruncatedNormal(0.12, 0.3, low=0.04, high=0.15))
 
     beta = numpyro.sample('beta', dist.Normal(0, 2))
@@ -599,6 +599,7 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
     mpisnzinf = mpisn + mpisndot
     mbhmax = numpyro.deterministic('mbhmax', mpisn + dmbhmax)
     log_dN = LogDNDMDQDV_evolve(a=a, b=b, c=c, mpisn=mpisn, mpisndot=mpisndot, mbhmax=mbhmax, sigma=sigma, fpl=fpl, beta=beta, lam=lam, kappa=kappa, zp=zp, zmax=zmax)
+    print(float(mpisn))
     zs = cosmo.z_of_dL(dls)
     m1s = m1s_det / (1 + zs)
 
@@ -731,4 +732,3 @@ def pop_cosmo_model_noselection(m1s_det, qs, dls, pdraw, **kwargs):
     _ = numpyro.deterministic('dNdVdt_fixed_mq', log_dN.mref*R*jnp.exp(log_dN(log_dN.mref, log_dN.qref, coords['z_grid'])))
     _ = numpyro.deterministic('hz', cosmo.h*cosmo.E(coords['z_grid']))
     """
-    

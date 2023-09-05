@@ -114,7 +114,7 @@ class LogDNDMPISN(object):
         max_co_mass = largest_mco(self.mpisn, self.mbhmax)
 
         mbh = jnp.linspace(min_bh_mass, max_bh_mass, self.n_m)
-        mco = jnp.logspace(min_co_mass, max_co_mass, self.n_m)
+        mco = jnp.linspace(min_co_mass, max_co_mass, self.n_m)
         log_wts = log_dNdmCO(mco[None,:], self.a, self.b) - 0.5*jnp.square((mbh[:,None] - mean_mbh_from_mco(mco[None,:], self.mpisn, self.mbhmax))/self.sigma) - np.log(np.sqrt(2*np.pi)) - jnp.log(self.sigma)
         log_trapz = np.log(0.5) + jnp.logaddexp(log_wts[:,1:], log_wts[:,:-1]) + jnp.log(jnp.diff(mco[None,:], axis=1))
         self.log_dN_grid = jss.logsumexp(log_trapz, axis=1)
@@ -166,7 +166,7 @@ class LogDNDMPISN_evolve(object):
     def __post_init__(self):
         min_bh_mass = 3.0
         min_co_mass = 1.0
-        max_bh_mass = jnp.max(self.mbhmax *(1 +7*self.sigma))
+        max_bh_mass = jnp.max(self.mbhmax *(1 + 4 * self.sigma))
         max_co_mass = largest_mco(self.mpisn, self.mbhmax)
 
         mbh = jnp.linspace(min_bh_mass, max_bh_mass, self.n_m+2)
@@ -174,9 +174,9 @@ class LogDNDMPISN_evolve(object):
 
         sigma = self.sigma#sigma_mbh_from_mco(mco[None,:], self.mpisn, self.mbhmax, self.sigma)
         mu = mean_mbh_from_mco(mco[None,:], self.mpisn, self.mbhmax)
-        mu = jnp.where(mu < 0.0, 0.0, mu)
+        exponent = jnp.where(mu < 0.0, jnp.NINF, -0.5* jnp.square((jnp.log(mbh[:,None,None]) - jnp.log(mu))/sigma))
 
-        log_wts = log_dNdmCO(mco[None,:], self.a, self.b) - 0.5*jnp.square((jnp.log(mbh[:,None,None]) - jnp.log(mu))/sigma) - np.log(np.sqrt(2*np.pi)) - jnp.log(sigma) - jnp.log(mbh[:,None,None]) 
+        log_wts = log_dNdmCO(mco[None,:], self.a, self.b) + exponent - np.log(np.sqrt(2*np.pi)) - jnp.log(sigma) - jnp.log(mbh[:,None,None]) 
         log_trapz = np.log(0.5) + jnp.logaddexp(log_wts[:,1:, :], log_wts[:,:-1, :]) + jnp.log(jnp.diff(mco[None,:], axis=1))
         self.log_dN_grid = jss.logsumexp(log_trapz, axis=1)
         self.mbh_grid = mbh
@@ -219,7 +219,7 @@ class LogDNDM_evolve(object):
         #self.log_norm = -(self(self.mref, self.zref) + jnp.log(self.mref)) # normalize so that m dNdm = 1 at mref
 
     def setup_interp(self):
-        self.z_array = jnp.expm1(jnp.linspace(np.log(1), np.log(1+self.zmax), 50))
+        self.z_array = jnp.expm1(jnp.linspace(np.log(1), jnp.log(1+self.zmax), 50))
         mpisns = self.mpisn + self.mpisndot * (1 - 1/(1+self.z_array))
         mbhmaxs = mpisns + self.dmbhmax
         self.log_dndm_pisn = LogDNDMPISN_evolve(self.a, self.b, jnp.array(mpisns), jnp.array(mbhmaxs), self.sigma)
@@ -261,12 +261,12 @@ class LogDNDM_evolve(object):
         #log_dNdm = jnp.where(m <= self.log_dndm_pisn.mbh_grid[0], log_dNdm[0], log_dNdm)
         log_dNdm = jnp.where(m >= self.log_dndm_pisn.mbh_grid[-1], np.NINF, log_dNdm)
         
-        mbhmax_at_samples = jnp.interp(z, xp = self.z_array, fp = self.mbhmaxs)
+        mbhmax_at_samples = jnp.array(self.mpisn + self.mpisndot * (1 - 1/(1+z)) + self.dmbhmax)
 
         log_dNdmbhmax_at_samples = self.interp_2d_dndmpisn(mbhmax_at_samples, z)
-        log_dNdm = jnp.logaddexp(log_dNdm, jnp.log(self.fpl) + -self.c*jnp.log(m/mbhmax_at_samples) + log_dNdmbhmax_at_samples + log_smooth_turnon(m, mbhmax_at_samples))
-        #log_dNdm = jnp.where(m < self.mbh_min, log_dNdm[0], log_dNdm)
-        
+        log_dNdm = jnp.logaddexp(log_dNdm, jnp.log(self.fpl) + log_dNdmbhmax_at_samples + -self.c*jnp.log(m/mbhmax_at_samples)  + log_smooth_turnon(m, mbhmax_at_samples))
+        log_dNdm = jnp.where(m < self.mbh_min, np.NINF, log_dNdm)
+
         return log_dNdm #+ self.log_norm
 
 @dataclass
@@ -395,9 +395,9 @@ class LogDNDMDQDV_evolve(object):
 
 
     def __post_init__(self):
-        self.log_dndm = LogDNDM_evolve(self.a, self.b, self.c, self.mpisn, self.mpisndot, self.mbhmax, self.sigma, self.fpl, mref=self.mref, zmax=self.zmax)
+        self.log_dndm = LogDNDM_evolve(self.a, self.b, self.c, self.mpisn, self.mpisndot, self.mbhmax, self.sigma, self.fpl, mref=self.mref, zmax=self.zmax, zref = self.zref)
         self.log_dndv = LogDNDV(self.lam, self.kappa, self.zp, self.zref, zmax=self.zmax)
-        self.log_norm = 2 * np.log(self.mref) + self.log_dndm(self.mref, self.zref) + self.log_dndm(self.qref * self.mref, self.zref) + self.log_dndv(self.zref)
+        self.log_norm = 2 * jnp.log(self.mref) + self.log_dndm(self.mref, self.zref) + self.log_dndm(self.qref * self.mref, self.zref) #+ self.log_dndv(self.zref)
 
     def __call__(self, m1, q, z):
         m1 = jnp.array(m1)
@@ -509,51 +509,7 @@ def cosmo_parameters():
     w = numpyro.sample('w', dist.TruncatedNormal(-1, 0.25, low=-1.5, high=-0.5))
 
     return h,Om,w
-"""
-def pop_model(m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel, Ndraw):
-    m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel = map(jnp.array, (m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel))
 
-    nobs = m1s.shape[0]
-    nsamp = m1s.shape[1]
-
-    nsel = m1s_sel.shape[0]
-
-    log_pdraw = jnp.log(pdraw)
-    log_pdraw_sel = jnp.log(pdraw_sel)
-
-    zmax = 20
-    zinterp = np.expm1(np.linspace(np.log1p(0), np.log1p(zmax), 1024))
-    dVdzdt_interp = 4*np.pi*Planck18.differential_comoving_volume(zinterp).to(u.Gpc**3/u.sr).value/(1+zinterp)
-    
-    a,b,c,mpisn,mbhmax,sigma,beta,fpl = mass_parameters()
-
-    lam,kappa,zp = redshift_parameters()
-
-    log_dN = LogDNDMDQDV(a, b, c, mpisn, mbhmax, sigma, fpl, beta, lam, kappa, zp)
-
-    log_wts = log_dN(m1s, qs, zs) + jnp.log(jnp.interp(zs, zinterp, dVdzdt_interp)) - log_pdraw
-    log_like = jss.logsumexp(log_wts, axis=1) - jnp.log(nsamp)
-    _ = numpyro.factor('loglike', jnp.sum(log_like))
-
-    log_sel_wts = log_dN(m1s_sel, qs_sel, zs_sel) + jnp.log(jnp.interp(zs_sel, zinterp, dVdzdt_interp)) - log_pdraw_sel
-    log_mu_sel = jss.logsumexp(log_sel_wts) - jnp.log(Ndraw)
-    _ = numpyro.factor('selfactor', -nobs*log_mu_sel)
-
-    log_mu2 = jss.logsumexp(2*log_sel_wts) - 2*jnp.log(Ndraw)
-    log_s2 = log_mu2 + jnp.log1p(-jnp.exp(2*log_mu_sel - jnp.log(Ndraw) - log_mu2))
-    _ = numpyro.deterministic('neff_sel', jnp.exp(2*log_mu_sel - log_s2))
-
-    mu_sel = jnp.exp(log_mu_sel)
-
-    R_unit = numpyro.sample('R_unit', dist.Normal(0, 1))
-    R = numpyro.deterministic('R', nobs/mu_sel + jnp.sqrt(nobs)/mu_sel*R_unit)
-
-    _ = numpyro.deterministic('neff', jnp.exp(2*jss.logsumexp(log_wts, axis=1) - jss.logsumexp(2*log_wts, axis=1)))
-
-    _ = numpyro.deterministic('mdNdmdVdt_fixed_qz', coords['m_grid']*R*jnp.exp(log_dN(coords['m_grid'], log_dN.qref, log_dN.zref)))
-    _ = numpyro.deterministic('dNdqdVdt_fixed_mz', log_dN.mref*R*jnp.exp(log_dN(log_dN.mref, coords['q_grid'], log_dN.zref)))
-    _ = numpyro.deterministic('dNdVdt_fixed_mq', log_dN.mref*R*jnp.exp(log_dN(log_dN.mref, log_dN.qref, coords['z_grid'])))
-"""
 def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel, Ndraw, evolution = False, zmax=20, fixed_cosmo_params = None):
     m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel = map(jnp.array, (m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel))
 
@@ -730,3 +686,48 @@ def pop_cosmo_model_noselection(m1s_det, qs, dls, pdraw, **kwargs):
     _ = numpyro.deterministic('dNdVdt_fixed_mq', log_dN.mref*R*jnp.exp(log_dN(log_dN.mref, log_dN.qref, coords['z_grid'])))
     _ = numpyro.deterministic('hz', cosmo.h*cosmo.E(coords['z_grid']))
     """
+"""
+def pop_model(m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel, Ndraw):
+    m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel = map(jnp.array, (m1s, qs, zs, pdraw, m1s_sel, qs_sel, zs_sel, pdraw_sel))
+
+    nobs = m1s.shape[0]
+    nsamp = m1s.shape[1]
+
+    nsel = m1s_sel.shape[0]
+
+    log_pdraw = jnp.log(pdraw)
+    log_pdraw_sel = jnp.log(pdraw_sel)
+
+    zmax = 20
+    zinterp = np.expm1(np.linspace(np.log1p(0), np.log1p(zmax), 1024))
+    dVdzdt_interp = 4*np.pi*Planck18.differential_comoving_volume(zinterp).to(u.Gpc**3/u.sr).value/(1+zinterp)
+    
+    a,b,c,mpisn,mbhmax,sigma,beta,fpl = mass_parameters()
+
+    lam,kappa,zp = redshift_parameters()
+
+    log_dN = LogDNDMDQDV(a, b, c, mpisn, mbhmax, sigma, fpl, beta, lam, kappa, zp)
+
+    log_wts = log_dN(m1s, qs, zs) + jnp.log(jnp.interp(zs, zinterp, dVdzdt_interp)) - log_pdraw
+    log_like = jss.logsumexp(log_wts, axis=1) - jnp.log(nsamp)
+    _ = numpyro.factor('loglike', jnp.sum(log_like))
+
+    log_sel_wts = log_dN(m1s_sel, qs_sel, zs_sel) + jnp.log(jnp.interp(zs_sel, zinterp, dVdzdt_interp)) - log_pdraw_sel
+    log_mu_sel = jss.logsumexp(log_sel_wts) - jnp.log(Ndraw)
+    _ = numpyro.factor('selfactor', -nobs*log_mu_sel)
+
+    log_mu2 = jss.logsumexp(2*log_sel_wts) - 2*jnp.log(Ndraw)
+    log_s2 = log_mu2 + jnp.log1p(-jnp.exp(2*log_mu_sel - jnp.log(Ndraw) - log_mu2))
+    _ = numpyro.deterministic('neff_sel', jnp.exp(2*log_mu_sel - log_s2))
+
+    mu_sel = jnp.exp(log_mu_sel)
+
+    R_unit = numpyro.sample('R_unit', dist.Normal(0, 1))
+    R = numpyro.deterministic('R', nobs/mu_sel + jnp.sqrt(nobs)/mu_sel*R_unit)
+
+    _ = numpyro.deterministic('neff', jnp.exp(2*jss.logsumexp(log_wts, axis=1) - jss.logsumexp(2*log_wts, axis=1)))
+
+    _ = numpyro.deterministic('mdNdmdVdt_fixed_qz', coords['m_grid']*R*jnp.exp(log_dN(coords['m_grid'], log_dN.qref, log_dN.zref)))
+    _ = numpyro.deterministic('dNdqdVdt_fixed_mz', log_dN.mref*R*jnp.exp(log_dN(log_dN.mref, coords['q_grid'], log_dN.zref)))
+    _ = numpyro.deterministic('dNdVdt_fixed_mq', log_dN.mref*R*jnp.exp(log_dN(log_dN.mref, log_dN.qref, coords['z_grid'])))
+"""

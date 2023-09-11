@@ -174,7 +174,7 @@ class LogDNDMPISN_evolve(object):
 
         sigma = self.sigma#sigma_mbh_from_mco(mco[None,:], self.mpisn, self.mbhmax, self.sigma)
         mu = mean_mbh_from_mco(mco[None,:], self.mpisn, self.mbhmax)
-        exponent = jnp.where(mu < 0.0, jnp.NINF, -0.5* jnp.square((jnp.log(mbh[:,None,None]) - jnp.log(mu))/sigma))
+        exponent = jnp.where(mu < 0.0, jnp.NINF, -0.5 * jnp.square((jnp.log(mbh[:,None,None]) - jnp.log(mu))/sigma) )
 
         log_wts = log_dNdmCO(mco[None,:], self.a, self.b) + exponent - np.log(np.sqrt(2*np.pi)) - jnp.log(sigma) - jnp.log(mbh[:,None,None]) 
         log_trapz = np.log(0.5) + jnp.logaddexp(log_wts[:,1:, :], log_wts[:,:-1, :]) + jnp.log(jnp.diff(mco[None,:], axis=1))

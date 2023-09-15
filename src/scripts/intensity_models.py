@@ -186,7 +186,6 @@ class LogDNDMPISN_evolve(object):
         mu = mean_mbh_from_mco(mco, mpisn, mbhmax)
         log_mu = jnp.log(jnp.where(mu > 0, mu, 0))
         log_p = -0.5*jnp.square((log_mbh - log_mu)/sigma) - 0.5*jnp.log(2*np.pi) - jnp.log(sigma) - log_mbh
-
         log_wts = log_dNdmCO(mco, self.a, self.b) + log_p
         log_trapz = np.log(0.5) + jnp.logaddexp(log_wts[:,:-1,:], log_wts[:,1:,:]) + jnp.log(jnp.diff(mco, axis=1))
         self.log_dN_grid = jss.logsumexp(log_trapz, axis=1)
@@ -261,8 +260,12 @@ class LogDNDM_evolve(object):
 
         t = jnp.where(m_lower == m_upper, 0, (m - m_lower) / mdiffs)
         u = jnp.where(z_lower == z_upper, 0, (z - z_lower) / zdiffs)
-        
-        return (1 - t) * (1 - u) * f1 + t * (1 - u) * f2 + t * u *f3 + (1 - t) * u * f4
+
+        coefficients = jnp.array([(1 - t) * (1 - u), t * (1 - u), t * u, (1 - t) * u  ])
+        fs = jnp.array([f1, f2, f3, f4])        
+        coefficients = jnp.where(jnp.isinf(fs), 1e-6, coefficients)
+
+        return jnp.einsum('i...,i...',coefficients, fs)
         
     def __call__(self, m, z):
         m = jnp.array(m)
@@ -508,7 +511,7 @@ def mass_parameters():
 
     beta = numpyro.sample('beta', dist.Normal(0, 2))
 
-    log_fpl = numpyro.sample('log_fpl', dist.Uniform(np.log(1e-3), np.log(0.5)))
+    log_fpl = numpyro.sample('log_fpl', dist.Uniform(np.log(1e-2), np.log(0.5)))
     fpl = numpyro.deterministic('fpl', jnp.exp(log_fpl))
 
     return a,b,c,mpisn,mbhmax,sigma,beta,fpl
@@ -529,7 +532,8 @@ def cosmo_parameters():
     return h,Om,w
 
 def evolve_parameters():
-    numpyro.sample('mpisndot', dist.Uinform(low=-2, high=8))
+    mpisndot = numpyro.sample('mpisndot', dist.Uniform(low=-2, high=8))
+    return mpisndot
 
 def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel, Ndraw, evolution = False, zmax=20, fixed_cosmo_params = None):
     m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel = map(jnp.array, (m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel))

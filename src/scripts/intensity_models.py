@@ -505,7 +505,7 @@ def mass_parameters():
     c = numpyro.sample('c', dist.TruncatedNormal(4, 2, low=0, high=8))
 
     mpisn = numpyro.sample('mpisn', dist.TruncatedNormal(35.0, 5.0, low=20.0, high=50.0))
-    dmbhmax = numpyro.sample('dmbhmax', dist.TruncatedNormal(5.0, 2.0, low=0.5, high=11.0))
+    dmbhmax = numpyro.sample('dmbhmax', dist.TruncatedNormal(5.0, 2.0, low=0.5, high=11.0))#used to be mean 5.0
     mbhmax = numpyro.deterministic('mbhmax', mpisn + dmbhmax)
     sigma = numpyro.sample('sigma', dist.TruncatedNormal(0.1, 0.1, low=0.05))
 

@@ -5,6 +5,8 @@ from dataclasses import dataclass
 import jax
 import jax.numpy as jnp
 import jax.scipy.special as jss
+import jax.scipy.stats as jsst
+import jax.scipy.integrate as jsi
 import numpy as np
 import numpyro 
 import numpyro.distributions as dist
@@ -55,6 +57,11 @@ def log_dNdmCO(mco, a, b):
     mtr = 20.0
     x = mco/mtr
     return jnp.where(mco < mtr, -a*jnp.log(x), -b*jnp.log(x))
+
+def smooth_log_dNdmCO(xx, a, b):
+    xtr = 20
+    delta = 0.05
+    return -a * jnp.log(xx / xtr) + delta * (a - b) * jnp.log(0.5 * (1 + (xx/xtr)**(1/delta)))
 
 def log_smooth_turnon(m, mmin, width=0.05):
     """A function that smoothly transitions from 0 to 1.
@@ -159,10 +166,10 @@ class LogDNDMPISN_evolve(object):
     mpisn: object
     mbhmax: object
     sigma: object
-    n_m: object = 800
+    n_m: object = 1024
     mbh_grid: object = dataclasses.field(init=False)
     log_dN_grid: object = dataclasses.field(init=False)
-
+ 
     def __post_init__(self):
         min_bh_mass = 3.0
         min_co_mass = 1.0
@@ -184,15 +191,22 @@ class LogDNDMPISN_evolve(object):
         mco = jnp.exp(log_mco)
 
         mu = mean_mbh_from_mco(mco, mpisn, mbhmax)
-        log_mu = jnp.log(jnp.where(mu > 0, mu, 0))
-        log_p = -0.5*jnp.square((log_mbh - log_mu)/sigma) - 0.5*jnp.log(2*np.pi) - jnp.log(sigma) - log_mbh
+        mu_min = 0.1
+        mu = jnp.where(mu > 0, mu, mu_min)
+        log_mu = jnp.log(mu)
+
+        log_p = -0.5 * jnp.square((log_mbh - log_mu) / sigma) - 0.5*jnp.log(2*jnp.pi) - jnp.log(sigma) - log_mbh
+
+        #log_p = -0.5*jnp.square((log_mbh - log_mu)/sigma) - 0.5*jnp.log(2*np.pi) - jnp.log(sigma) - log_mbh
+
+        #log_p = jsst.norm.logpdf(x = log_mbh, loc = log_mu, scale = sigma) - log_mbh
+
         log_wts = log_dNdmCO(mco, self.a, self.b) + log_p
+        #log_trapz = jnp.log(jsi.trapezoid(x = mco, y = jnp.exp(log_wts), axis=1))
         log_trapz = np.log(0.5) + jnp.logaddexp(log_wts[:,:-1,:], log_wts[:,1:,:]) + jnp.log(jnp.diff(mco, axis=1))
+
         self.log_dN_grid = jss.logsumexp(log_trapz, axis=1)
         self.mbh_grid = mbh[0,0,:]
-
-    #def __call__(self, m):
-        #return jnp.interp(m, self.mbh_grid, self.log_dN_grid)
 
 
 @dataclass
@@ -224,7 +238,7 @@ class LogDNDM_evolve(object):
         #mpisn_at_zref = self.mpisn + self.mpisndot * (1 - 1/(1 + self.zref))
         #mbhmax_at_zref = mpisn_at_zref + self.dmbhmax
         
-       # self.log_pl_norm = jnp.log(self.fpl) + self.interp_2d_dndmpisn(mbhmax_at_zref, self.zref)
+        #self.log_pl_norm = jnp.log(self.fpl) + self.interp_2d_dndmpisn(mbhmax_at_zref, self.zref)
 
         #self.log_norm = -(self(self.mref, self.zref) + jnp.log(self.mref)) # normalize so that m dNdm = 1 at mref
 
@@ -232,7 +246,7 @@ class LogDNDM_evolve(object):
         self.z_array = jnp.expm1(jnp.linspace(np.log(1), jnp.log(1+self.zmax), 50))
         mpisns = self.mpisn + self.mpisndot * (1 - 1/(1+self.z_array))
         mbhmaxs = mpisns + self.dmbhmax
-        self.log_dndm_pisn = LogDNDMPISN_evolve(self.a, self.b, jnp.array(mpisns), jnp.array(mbhmaxs), self.sigma)
+        self.log_dndm_pisn = LogDNDMPISN_evolve(self.a, self.b, mpisns, mbhmaxs, self.sigma)
         self.mbh_grid = self.log_dndm_pisn.mbh_grid
         self.log_dndm_pisn_grid = self.log_dndm_pisn.log_dN_grid.T
         self.mbhmaxs = jnp.array(mbhmaxs)
@@ -505,7 +519,7 @@ def mass_parameters():
     c = numpyro.sample('c', dist.TruncatedNormal(4, 2, low=0, high=8))
 
     mpisn = numpyro.sample('mpisn', dist.TruncatedNormal(35.0, 5.0, low=20.0, high=50.0))
-    dmbhmax = numpyro.sample('dmbhmax', dist.TruncatedNormal(5.0, 2.0, low=0.5, high=11.0))#used to be mean 5.0
+    dmbhmax = numpyro.sample('dmbhmax', dist.TruncatedNormal(3.0, 2.0, low=0.5, high=7.0))#used to be mean 5.0
     mbhmax = numpyro.deterministic('mbhmax', mpisn + dmbhmax)
     sigma = numpyro.sample('sigma', dist.TruncatedNormal(0.1, 0.1, low=0.05))
 

@@ -546,7 +546,7 @@ def cosmo_parameters():
     return h,Om,w
 
 def evolve_parameters():
-    mpisndot = numpyro.sample('mpisndot', dist.Uniform(low=-2, high=8))
+    mpisndot = numpyro.sample('mpisndot', dist.Uniform(low=-20, high=50))
     return mpisndot
 
 def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel, Ndraw, evolution = False, zmax=20, fixed_cosmo_params = None):

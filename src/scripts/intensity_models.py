@@ -228,7 +228,7 @@ class LogDNDM_evolve(object):
     mbh_min: object = mbh_min
     zmax: object = 20
     mref: object = 30.0
-    zref: object = 0
+    zref: object = 0.001
     log_dndm_pisn: object = dataclasses.field(init=False)
 
     def __post_init__(self):
@@ -295,7 +295,7 @@ class LogDNDM_evolve(object):
         log_dNdm = jnp.logaddexp(log_dNdm, jnp.log(self.fpl) + log_dNdmbhmax_at_samples + -self.c*jnp.log(m/mbhmax_at_samples)  + log_smooth_turnon(m, mbhmax_at_samples))
         log_dNdm = jnp.where(m < self.mbh_min, np.NINF, log_dNdm)
 
-        return log_dNdm #+ self.log_norm
+        return log_dNdm 
 
 @dataclass
 class LogDNDM(object):
@@ -348,7 +348,7 @@ class LogDNDV(object):
     lam: object
     kappa: object
     zp: object
-    zref: object = 0.01
+    zref: object = 0.001
     zmax: object = 20
     log_norm: object = 0.0
 
@@ -378,7 +378,7 @@ class LogDNDMDQDV(object):
     zp: object
     mref: object = 30.0
     qref: object = 1.0
-    zref: object = 0.01
+    zref: object = 0.001
     log_dndm: object = dataclasses.field(init=False)
     log_dndv: object = dataclasses.field(init=False)
 
@@ -416,7 +416,7 @@ class LogDNDMDQDV_evolve(object):
     zp: object
     mref: object = 30.0
     qref: object = 1.0
-    zref: object = 0.0
+    zref: object = 0.001
     zmax: object = 20
     log_dndm: object = dataclasses.field(init=False)
     log_dndv: object = dataclasses.field(init=False)
@@ -524,7 +524,7 @@ def mass_parameters():
     sigma = numpyro.sample('sigma', dist.TruncatedNormal(0.1, 0.1, low=0.05))
 
     beta = numpyro.sample('beta', dist.Normal(0, 2))
-
+    #beta = numpyro.deterministic('beta', 0.0)
     log_fpl = numpyro.sample('log_fpl', dist.Uniform(np.log(1e-2), np.log(0.5)))
     fpl = numpyro.deterministic('fpl', jnp.exp(log_fpl))
 
@@ -546,7 +546,7 @@ def cosmo_parameters():
     return h,Om,w
 
 def evolve_parameters():
-    mpisndot = numpyro.sample('mpisndot', dist.Uniform(low=-20, high=50))
+    mpisndot = numpyro.sample('mpisndot', dist.Uniform(low=-2, high=8))
     return mpisndot
 
 def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel, Ndraw, evolution = False, zmax=20, fixed_cosmo_params = None):

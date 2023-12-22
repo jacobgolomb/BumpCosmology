@@ -180,7 +180,8 @@ def extract_selection_samples(file, nsamp, desired_pop_wt=None, far_threshold=1,
 
         pdraw_sel = np.array(f['injections/mass1_source_mass2_source_sampling_pdf'])*np.array(f['injections/redshift_sampling_pdf'])*m1s_sel
 
-        #pdraw_sel *= np.array(f['injections/spin1x_spin1y_spin1z_sampling_pdf']) * np.array(f['injections/spin2x_spin2y_spin2z_sampling_pdf']) * 2 * np.pi * a1s_sel**2 * 2 * np.pi * a2s_sel**2
+        pdraw_sel *= (np.array(f['injections/spin1x_spin1y_spin1z_sampling_pdf']) * np.array(f['injections/spin2x_spin2y_spin2z_sampling_pdf']) 
+                    * (2 * np.pi * a1s_sel**2 * 2 * np.pi * a2s_sel**2))
 
         #pdraw_sel *= p_chi_eff
 
@@ -192,7 +193,7 @@ def extract_selection_samples(file, nsamp, desired_pop_wt=None, far_threshold=1,
         detected = (pycbc_far < far_threshold) | (pycbc_bbh_far < far_threshold) | (gstlal_far < far_threshold) | (mbta_far < far_threshold) 
         ndraw = f.attrs['n_accepted'] + f.attrs['n_rejected']
 
-        T = (f.attrs['analysis_time_s'])/(3600.0*24.0*365.25) 
+        T = (f.attrs['analysis_time_s'])/(3600.0*24.0*365.25)
 
         pdraw_sel /= T
 

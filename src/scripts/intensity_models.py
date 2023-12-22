@@ -524,7 +524,6 @@ def mass_parameters():
     sigma = numpyro.sample('sigma', dist.TruncatedNormal(0.1, 0.1, low=0.05))
 
     beta = numpyro.sample('beta', dist.Normal(0, 2))
-    #beta = numpyro.deterministic('beta', 0.0)
     log_fpl = numpyro.sample('log_fpl', dist.Uniform(np.log(1e-2), np.log(0.5)))
     fpl = numpyro.deterministic('fpl', jnp.exp(log_fpl))
 
@@ -547,6 +546,7 @@ def cosmo_parameters():
 
 def evolve_parameters():
     mpisndot = numpyro.sample('mpisndot', dist.Uniform(low=-2, high=8))
+    #mpisndot = numpyro.sample('mpisndot', dist.Uniform(low=-50, high=60))
     return mpisndot
 
 def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw_sel, Ndraw, evolution = False, zmax=20, fixed_cosmo_params = None):

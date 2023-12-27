@@ -12,8 +12,6 @@ import numpyro
 import numpyro.distributions as dist
 from utils import jnp_cumtrapz, sample_parameters_from_dict
 
-mbh_min = 5.0
-
 def mean_mbh_from_mco(mco, mpisn, mbhmax):
     """The mean black hole mass from the core-mass to remnant-mass relation.
     
@@ -148,7 +146,7 @@ class LogDNDM(object):
     mbhmax: object
     sigma: object
     fpl: object
-    mbh_min: object = mbh_min
+    mbh_min: object
     zmax: object = 20
     mref: object = 30.0
     zref: object = 0.001
@@ -257,12 +255,13 @@ class LogDNDMDQDV(object):
     qref: object = 1.0
     zref: object = 0.001
     zmax: object = 20
+    mbh_min = object = 5.0
     log_dndm: object = dataclasses.field(init=False)
     log_dndv: object = dataclasses.field(init=False)
 
 
     def __post_init__(self):
-        self.log_dndm = LogDNDM(self.a, self.b, self.c, self.mpisn, self.mpisndot, self.mbhmax, self.sigma, self.fpl, mref=self.mref, zmax=self.zmax, zref = self.zref)
+        self.log_dndm = LogDNDM(self.a, self.b, self.c, self.mpisn, self.mpisndot, self.mbhmax, self.sigma, self.fpl, mref=self.mref, zmax=self.zmax, zref = self.zref, mbh_min = self.mbh_min)
         self.log_dndv = LogDNDV(self.lam, self.kappa, self.zp, self.zref, zmax=self.zmax)
         self._normalize()
 
@@ -438,7 +437,7 @@ def pop_cosmo_model(m1s_det, qs, dls, pdraw, m1s_det_sel, qs_sel, dls_sel, pdraw
         
     log_dN = LogDNDMDQDV(a=sample['a'], b=sample['b'], c=sample['c'], mpisn=sample['mpisn'], mpisndot=sample['mpisndot'], 
                         mbhmax=sample['mbhmax'], sigma=sample['sigma'], fpl=sample['fpl'], beta=sample['beta'], 
-                        lam=sample['lam'], kappa=sample['kappa'], zp=sample['zp'], zmax=sample['zmax'])
+                        lam=sample['lam'], kappa=sample['kappa'], zp=sample['zp'], zmax=sample['zmax'], mbh_min=sample['mbh_min'])
 
     zs = cosmo.z_of_dL(dls)
     m1s = m1s_det / (1 + zs)

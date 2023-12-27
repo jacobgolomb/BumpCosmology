@@ -29,10 +29,10 @@ class ModelParameters(object):
 
 default_parameters = ModelParameters()
 
-default_log_dNdmdqdV = intensity_models.LogDNDMDQDV(default_parameters.a, default_parameters.b, default_parameters.c, default_parameters.mpisn, default_parameters.mbhmax, default_parameters.sigma, default_parameters.fpl, default_parameters.beta, default_parameters.lam, default_parameters.kappa, default_parameters.zp)
-default_log_dNdmdqdV.__doc__ = r"""
-Default mass-redshift distribution, more-or-less a reasonable fit to O3a.
-"""
+##default_log_dNdmdqdV = intensity_models.LogDNDMDQDV(default_parameters.a, default_parameters.b, default_parameters.c, default_parameters.mpisn, default_parameters.mbhmax, default_parameters.sigma, default_parameters.fpl, default_parameters.beta, default_parameters.lam, default_parameters.kappa, default_parameters.zp)
+#default_log_dNdmdqdV.__doc__ = r"""
+#Default mass-redshift distribution, more-or-less a reasonable fit to O3a.
+#"""
 
 def default_pop_wt(m1, q, z):
     """Weights in `(m1,q,z)` corresponding to the :func:`default_log_dNdmdqdV`."""
@@ -165,26 +165,10 @@ def extract_selection_samples(file, nsamp, desired_pop_wt=None, far_threshold=1,
             np.array(f[f'injections/spin2z']) / a2s_sel
         )
 
-        chi_effs_sel = np.array(
-            (a1s_sel * costilt1s_sel +
-                a2s_sel * costilt2s_sel * qs_sel)
-                / (1 + qs_sel)
-        )
-
-        p_chi_eff = (
-            chi_effective_prior_from_isotropic_spins(
-            mass_ratio = qs_sel,
-            a_max = 0.998,
-            xs = chi_effs_sel)
-        )
 
         pdraw_sel = np.array(f['injections/mass1_source_mass2_source_sampling_pdf'])*np.array(f['injections/redshift_sampling_pdf'])*m1s_sel
 
-        pdraw_sel *= (np.array(f['injections/spin1x_spin1y_spin1z_sampling_pdf']) * np.array(f['injections/spin2x_spin2y_spin2z_sampling_pdf']) 
-                    * (2 * np.pi * a1s_sel**2 * 2 * np.pi * a2s_sel**2))
-
-        #pdraw_sel *= p_chi_eff
-
+        #pdraw_sel *= (np.array(f['injections/spin1x_spin1y_spin1z_sampling_pdf']) * np.array(f['injections/spin2x_spin2y_spin2z_sampling_pdf']) * (2 * np.pi * a1s_sel**2 * 2 * np.pi * a2s_sel**2))
         pycbc_far = np.array(f['injections/far_pycbc_hyperbank'])
         pycbc_bbh_far = np.array(f['injections/far_pycbc_bbh'])
         gstlal_far = np.array(f['injections/far_gstlal'])
@@ -204,8 +188,6 @@ def extract_selection_samples(file, nsamp, desired_pop_wt=None, far_threshold=1,
         a2s_sel = a2s_sel[detected]
         costilt1s_sel = costilt1s_sel[detected]
         costilt2s_sel = costilt2s_sel[detected]
-
-        chi_effs_sel = chi_effs_sel[detected]
         pdraw_sel = pdraw_sel[detected]
 
         if desired_pop_wt is None:
@@ -228,7 +210,6 @@ def extract_selection_samples(file, nsamp, desired_pop_wt=None, far_threshold=1,
         a2s_sel_cut = a2s_sel[inds]
         costilt1s_sel_cut = costilt1s_sel[inds]
         costilt2s_sel_cut = costilt2s_sel[inds]
-        chi_effs_sel_cut = chi_effs_sel[inds]
         pdraw_sel_cut = pdraw_wt[inds]
         ndraw_cut = len(m1s_sel)
 

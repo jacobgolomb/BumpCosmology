@@ -1,7 +1,7 @@
 from astropy.cosmology import Planck18
 import astropy.units as u
 import lal
-import lalsimulation as ls
+import lalsimulation as lalsim
 import numpy as np
 import os.path as op
 import sys
@@ -12,76 +12,61 @@ import weighting
 import scipy.integrate as sint
 import intensity_models
 
+SENSITIVITIES = {'aLIGO': lalsim.SimNoisePSDaLIGODesignSensitivityP1200087,
+                'aplus': lalsim.SimNoisePSDaLIGOAPlusDesignSensitivityT1800042,
+                'CE': lalsim.SimNoisePSDCosmicExplorerP1600143}
+
 def next_pow_2(x):
     np2 = 1
     while np2 < x:
         np2 = np2 << 1
     return np2
 
-def compute_snrs(d):
-    snrhs = []
-    snrls = []
-    snrvs = []
+def compute_snrs(d, detectors = ['H1', 'L1'], sensitivity = 'aLIGO', fmin = 20, fmax = 2048, psdstart = 20):
+    psdstop = 0.95*fmax
     snrs = []
-    for _, r in d.iterrows():
-        mlow = 5*(r.z-2)/(0.75-2) + 30*(r.z-0.75)/(2-0.75)
-        mhigh = 150*(r.z-2.5)/(1.5-2.5) + 70*(r.z-1.5)/(2.5-1.5)
-        if r.m1 > mlow and r.m1 < mhigh:
-            m2s = r.m1*r.q
-            m1d = r.m1*(1+r.z)
-            m2d = m2s*(1+r.z)
+    for _, r in tqdm(d.iterrows(), total=len(d)):
+        m2s = r.m1*r.q
+        m1d = r.m1*(1+r.z)
+        m2d = m2s*(1+r.z)
 
-            a1 = np.sqrt(r.s1x*r.s1x + r.s1y*r.s1y + r.s1z*r.s1z)
-            a2 = np.sqrt(r.s2x*r.s2x + r.s2y*r.s2y + r.s2z*r.s2z)
-            dl = d['dL'] * 1e9*lal.PC_SI
+        a1 = np.sqrt(r.s1x*r.s1x + r.s1y*r.s1y + r.s1z*r.s1z)
+        a2 = np.sqrt(r.s2x*r.s2x + r.s2y*r.s2y + r.s2z*r.s2z)
+        dl = r.dL * 1e9*lal.PC_SI
 
-            fmin = 9.0
-            fref = fmin
-            psdstart = 10.0
+        fref = fmin
 
-            T = next_pow_2(ls.SimInspiralChirpTimeBound(fmin, m1d*lal.MSUN_SI, m2d*lal.MSUN_SI, a1, a2))
-            df = 1/T
-            fmax = 2048.0
-            psdstop = 0.95*fmax
+        T = next_pow_2(lalsim.SimInspiralChirpTimeBound(fmin, m1d*lal.MSUN_SI, m2d*lal.MSUN_SI, a1, a2))
+        df = 1/T
 
-            Nf = int(round(fmax/df)) + 1
-            fs = np.linspace(0, fmax, Nf)
-
-            hp, hc = ls.SimInspiralChooseFDWaveform(m1d*lal.MSUN_SI, m2d*lal.MSUN_SI, r.s1x, r.s1y, r.s1z, r.s2x, r.s2y, r.s2z, dl, r.iota, 0.0, 0.0, 0.0, 0.0, df, fmin, fmax, fref, None, ls.IMRPhenomXPHM)
-
-            sn = []
-            for det in ['H1', 'L1', 'V1']:
-                h = lal.CreateCOMPLEX16FrequencySeries('h', hp.epoch, hp.f0, hp.deltaF, hp.sampleUnits, hp.data.data.shape[0])
-                psd = lal.CreateREAL8FrequencySeries("psds", 0, 0.0, df, lal.DimensionlessUnit, fs.shape[0])
-    
-                dd = lal.cached_detector_by_prefix[det]
-                Fp, Fc = lal.ComputeDetAMResponse(dd.response, r.ra, r.dec, r.psi, r.gmst)
-    
-                h.data.data = Fp*hp.data.data + Fc*hc.data.data
-
-                if det in ['H1', 'L1']:
-                    ls.SimNoisePSDaLIGODesignSensitivityP1200087(psd, psdstart)
-                else:
-                    ls.SimNoisePSDAdVDesignSensitivityP1200087(psd, psdstart)
-
-                sn.append(ls.MeasureSNRFD(h, psd, psdstart, psdstop))
-            sn = np.array(sn)
-            snrhs.append(sn[0])
-            snrls.append(sn[1])
-            snrvs.append(sn[2])
-            snrs.append(np.sqrt(np.sum(np.square(sn))))
-        else:
-            snrhs.append(0)
-            snrls.append(0)
-            snrvs.append(0)
+        Nf = int(round(fmax/df)) + 1
+        fs = np.linspace(0, fmax, Nf)
+        try:
+            hp, hc = lalsim.SimInspiralChooseFDWaveform(m1d*lal.MSUN_SI, m2d*lal.MSUN_SI, r.s1x, r.s1y, r.s1z, r.s2x, r.s2y, r.s2z, dl, r.iota, 0.0, 0.0, 0.0, 0.0, df, fmin, fmax, fref, None, lalsim.IMRPhenomXPHM)
+        except Exception as e:
+            print(e.args)
             snrs.append(0)
+            continue
 
-    d['SNR_H1'] = snrhs
-    d['SNR_L1'] = snrls
-    d['SNR_V1'] = snrvs
-    d['SNR'] = snrs
+        sn = []
+        for det in detectors:
+            h = lal.CreateCOMPLEX16FrequencySeries('h', hp.epoch, hp.f0, hp.deltaF, hp.sampleUnits, hp.data.data.shape[0])
+            psd = lal.CreateREAL8FrequencySeries("psds", 0, 0.0, df, lal.DimensionlessUnit, fs.shape[0])
 
-    return d
+            dd = lal.cached_detector_by_prefix[det]
+            Fp, Fc = lal.ComputeDetAMResponse(dd.response, r.ra, r.dec, r.psi, r.gmst)
+
+            h.data.data = Fp*hp.data.data + Fc*hc.data.data
+
+            SENSITIVITIES[sensitivity](psd, psdstart)
+
+            sn.append(lalsim.MeasureSNRFD(h, psd, psdstart, psdstop))
+        sn = np.array(sn)
+        snrs.append(np.sqrt(np.sum(np.square(sn))))
+    else:
+        snrs.append(0)
+
+    return snrs
 
 class ZPDF(object):
     def __init__(self, lam, kappa, zp, zmax, cosmo):
@@ -202,7 +187,7 @@ if __name__ == '__main__':
     #rng = np.random.default_rng(333165393797366967556667466879860422123)
     rng = np.random.default_rng()
 
-    ndraw = int(1e8)
+    ndraw = int(1e6)
 
     #df = pd.DataFrame(columns = ['m1', 'q', 'z', 'iota', 'ra', 'dec', 'psi', 'gmst', 's1x', 's1y', 's1z', 's2x', 's2y', 's2z', 'pdraw_mqz', 'SNR_H1', 'SNR_L1', 'SNR_V1', 'SNR'])
     print("drawing zs and ms")
@@ -264,7 +249,7 @@ if __name__ == '__main__':
         'dm1sz_dm1ddl': dm1sz_dm1ddl
     })
     if snr_threshold > 0:
-        df = compute_snrs(df)
+        df['SNR'] = compute_snrs(df)
     else:
         df['SNR'] = 10000000
     p_pop_numerator = weighting.pop_wt(np.array(df['m1']), np.array(df['q']), np.array(df['z']), default=default, **population_parameters)

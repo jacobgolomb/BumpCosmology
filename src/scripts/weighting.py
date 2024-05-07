@@ -45,10 +45,7 @@ def pop_wt(m1, q, z, default=True, **kwargs):
         log_dN_func = default_log_dNdmdqdV
     else:
         h, Om, w = kwargs.pop('h'), kwargs.pop('Om'), kwargs.pop('w')
-        if 'mpisndot' in kwargs.keys():
-            log_dN_obj = intensity_models.LogDNDMDQDV_evolve
-        else:
-            log_dN_obj = intensity_models.LogDNDMDQDV
+        log_dN_obj = intensity_models.LogDNDMDQDV
         pop_params = {key: kwargs[key] for key in getfullargspec(log_dN_obj)[0][1:] if key in kwargs.keys()}
         log_dN_func = log_dN_obj(**pop_params)
     if "cosmo" not in kwargs.keys():

@@ -414,3 +414,9 @@ def sample_parameters_from_dict(prior):
         else:
             samples[param] = numpyro.sample(param, prior[param])
     return samples
+
+def log_expit(exponent):
+    epsilon = 1e-8
+    expres = jnp.exp(-exponent)
+    result = -jnp.log1p(expres+epsilon)
+    return result

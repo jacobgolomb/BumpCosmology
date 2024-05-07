@@ -63,8 +63,6 @@ def compute_snrs(d, detectors = ['H1', 'L1'], sensitivity = 'aLIGO', fmin = 20, 
             sn.append(lalsim.MeasureSNRFD(h, psd, psdstart, psdstop))
         sn = np.array(sn)
         snrs.append(np.sqrt(np.sum(np.square(sn))))
-    else:
-        snrs.append(0)
 
     return snrs
 
@@ -152,49 +150,41 @@ def calc_nex(df_det, default_settings, **kwargs):
 
 if __name__ == '__main__':
 
-    if sys.argv[1] == 'default':
-        default = True
-    else:
-        default = False
-        custom_params_file = sys.argv[1]
-    if sys.argv[2]:
-        snr_threshold = float(sys.argv[2])
-    else:
-        snr_threshold = 0
-    if sys.argv[3]:
-        outfile = sys.argv[3]
-    else:
-        outfile = op.join(paths.data, 'mock_injections.h5')
+    config_file = sys.argv[1]
+    outfile = sys.argv[2]
 
     population_parameters = dict()
-    if not default:
-        with open(custom_params_file) as param_file:
-            for line in param_file:
-                (key, val) = line.split('=')
-                population_parameters[key.strip()] = float(val.strip())
 
-    custom_cosmo = None
-    if not default:
-        custom_cosmo = intensity_models.FlatwCDMCosmology(population_parameters['h'], population_parameters['Om'], population_parameters['w'], population_parameters['zmax'])
-        population_parameters['cosmo'] = custom_cosmo
-        print("Using the following custom population_parameters: " + str(population_parameters))
-    if default:
-        zpdf = ZPDF(lam=2.7, kappa=5.6, zp=1.9, zmax = 20, cosmo='default')
-    else:
-        zpdf = ZPDF(lam=population_parameters["lam"], kappa=population_parameters["kappa"], zp=population_parameters["zp"], zmax = population_parameters.get("zmax", 20), cosmo=population_parameters["cosmo"])
-    mpdf = PowerLawPDF(2.35, 5, 400)
+    with open(config_file) as param_file:
+        for line in param_file:
+            (key, val) = line.split('=')
+            population_parameters[key.strip()] = val.strip()
+            try:
+                population_parameters[key.strip()] = float(val.strip())
+            except ValueError:
+                pass
+    
+    snr_threshold = population_parameters.pop('snr_threshold', 0)
+    ndraw = int(population_parameters.pop('ndraw', 1000000))
+    sensitivity = population_parameters.pop('sensitivity', 'aLIGO')
+    detectors = population_parameters.pop('detectors', 'H1,L1').split(',')
+        
+    custom_cosmo = intensity_models.FlatwCDMCosmology(population_parameters['h'], population_parameters['Om'], population_parameters['w'], population_parameters['zmax'])
+    population_parameters['cosmo'] = custom_cosmo
+    print("Using the following custom population_parameters: " + str(population_parameters))
+    
+    zpdf = ZPDF(lam=population_parameters["lam"], kappa=population_parameters["kappa"], zp=population_parameters["zp"], zmax = population_parameters.get("zmax", 20), cosmo=population_parameters["cosmo"])
+    mpdf = PowerLawPDF(1.8, population_parameters["mbh_min"], 400)
 
     #rng = np.random.default_rng(333165393797366967556667466879860422123)
     rng = np.random.default_rng()
-
-    ndraw = int(1e6)
 
     #df = pd.DataFrame(columns = ['m1', 'q', 'z', 'iota', 'ra', 'dec', 'psi', 'gmst', 's1x', 's1y', 's1z', 's2x', 's2y', 's2z', 'pdraw_mqz', 'SNR_H1', 'SNR_L1', 'SNR_V1', 'SNR'])
     print("drawing zs and ms")
     z = zpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
     m = mpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
     print("drawing mts")
-    mtpdf = PowerLawPDF(2, m+5, 2*m)
+    mtpdf = PowerLawPDF(2, m+population_parameters['mbh_min'], 2 * m)
 
     mt = mtpdf.icdf(rng.uniform(low=0, high=1, size=ndraw))
 
@@ -216,17 +206,13 @@ if __name__ == '__main__':
 
     print("assigning spins")
 
-    s1x, s1y, s1z = rng.normal(loc=0, scale=0.2/np.sqrt(3), size=(3,ndraw))
-    s2x, s2y, s2z = rng.normal(loc=0, scale=0.2/np.sqrt(3), size=(3,ndraw))
+    s1x, s1y, s1z = 0,0,0#rng.normal(loc=0, scale=0.2/np.sqrt(3), size=(3,ndraw))
+    s2x, s2y, s2z = 0,0,0#rng.normal(loc=0, scale=0.2/np.sqrt(3), size=(3,ndraw))
 
     print("calculating dLs")
 
-    if default:
-        dL = Planck18.luminosity_distance(z).to(u.Gpc).value
-        dm1sz_dm1ddl = weighting.dm1sz_dm1ddl(z, cosmo=None)
-    else:
-        dm1sz_dm1ddl = weighting.dm1sz_dm1ddl(z, cosmo=population_parameters['cosmo'])
-        dL = population_parameters['cosmo'].dL(z)
+    dm1sz_dm1ddl = weighting.dm1sz_dm1ddl(z, cosmo=population_parameters['cosmo'])
+    dL = population_parameters['cosmo'].dL(z)
 
     df = pd.DataFrame({
         'm1': m,
@@ -249,19 +235,20 @@ if __name__ == '__main__':
         'dm1sz_dm1ddl': dm1sz_dm1ddl
     })
     if snr_threshold > 0:
-        df['SNR'] = compute_snrs(df)
+        df['SNR'] = compute_snrs(df, detectors=detectors, sensitivity=sensitivity)
     else:
         df['SNR'] = 10000000
-    p_pop_numerator = weighting.pop_wt(np.array(df['m1']), np.array(df['q']), np.array(df['z']), default=default, **population_parameters)
+    p_pop_numerator = weighting.pop_wt(np.array(df['m1']), np.array(df['q']), np.array(df['z']), default=False, **population_parameters)
 
     df['p_pop_weight'] = p_pop_numerator / df['pdraw_mqz']
     df['p_pop_numerator'] = p_pop_numerator
 
     random_number = rng.uniform(low=0, high=1, size = len(p_pop_numerator))
     sel = random_number < (df['p_pop_weight'] / np.max(df['p_pop_weight']))
-    df_det = df[df['SNR'] > snr_threshold][sel]
+    population_samples = df[sel]
+    df_det = population_samples[population_samples['SNR'] > snr_threshold]
 
-    print(f"Retained {len(df_det)} samples after rejection sampling.")
+    print(f"Retained {len(df_det)} samples after rejection sampling and applying snr cut.")
 
     df_det.to_hdf(outfile, key='true_parameters')
 

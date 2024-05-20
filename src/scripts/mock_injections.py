@@ -42,7 +42,7 @@ def compute_snrs(d, detectors = ['H1', 'L1'], sensitivity = 'aLIGO', fmin = 20, 
         Nf = int(round(fmax/df)) + 1
         fs = np.linspace(0, fmax, Nf)
         try:
-            hp, hc = lalsim.SimInspiralChooseFDWaveform(m1d*lal.MSUN_SI, m2d*lal.MSUN_SI, r.s1x, r.s1y, r.s1z, r.s2x, r.s2y, r.s2z, dl, r.iota, 0.0, 0.0, 0.0, 0.0, df, fmin, fmax, fref, None, lalsim.IMRPhenomXPHM)
+            hp, hc = lalsim.SimInspiralChooseFDWaveform(m1d*lal.MSUN_SI, m2d*lal.MSUN_SI, r.s1x, r.s1y, r.s1z, r.s2x, r.s2y, r.s2z, dl, r.iota, 0.0, 0.0, 0.0, 0.0, df, fmin, fmax, fref, None, lalsim.IMRPhenomD)
         except Exception as e:
             print(e.args)
             snrs.append(0)

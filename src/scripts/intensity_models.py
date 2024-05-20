@@ -106,7 +106,7 @@ class LogDNDMPISN(object):
     mpisn: object
     mbhmax: object
     sigma: object
-    n_m: object = 1024
+    n_m: object = 1800
     mbh_grid: object = dataclasses.field(init=False)
     log_dN_grid: object = dataclasses.field(init=False)
  
@@ -171,13 +171,13 @@ class LogDNDM(object):
         self.setup_interp()
 
     def setup_interp(self):
-        self.z_array = jnp.expm1(jnp.linspace(np.log(1), jnp.log(1+self.zmax), 50))
+        self.z_array = jnp.expm1(jnp.linspace(np.log(1), jnp.log(1+self.zmax), 30))
         mpisns = self.mpisn + self.mpisndot * (1 - 1/(1+self.z_array))
         mbhmaxs = mpisns + self.dmbhmax
         self.log_dndm_pisn = LogDNDMPISN(self.a, self.b, mpisns, mbhmaxs, self.sigma)
         self.mbh_grid = self.log_dndm_pisn.mbh_grid
         self.log_dndm_pisn_grid = self.log_dndm_pisn.log_dN_grid.T
-        self.mbhmaxs = jnp.array(mbhmaxs)
+        self.mbhmaxs = jnp.asarray(mbhmaxs)
     
     def interp_2d_dndmpisn(self, m, z):
         m_indxs = jnp.searchsorted(self.mbh_grid, m)
